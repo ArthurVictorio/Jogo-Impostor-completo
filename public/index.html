@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O Mentiroso</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-a: #050414;
+            --bg-b: #2c2fd0;
+            --gold: #f0c419;
+            --gold-dark: #caa000;
+            --gold-soft: rgba(240,196,25,.16);
+            --ink: #11122a;
+            --paper: #faf6ec;
+            --paper-dim: #ece4cf;
+            --success: #34c777;
+            --danger: #e0554a;
+            --detective: #4d90d9;
+            --line: rgba(240,196,25,.22);
+            --radius-lg: 22px;
+            --radius-md: 14px;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body {
+            font-family: 'Manrope', sans-serif;
+            color: var(--paper);
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--bg-a) 0%, var(--bg-a) 25%, #171a5e 62%, var(--bg-b) 100%);
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            padding: 28px 16px 60px;
+        }
+        .app { width: 100%; max-width: 980px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+        .wordmark {
+            font-family: 'Playfair Display', serif;
+            font-weight: 800;
+            letter-spacing: .01em;
+            text-align: center;
+            color: var(--paper);
+        }
+        .wordmark .accent { color: var(--gold); }
+        h1.wordmark { font-size: clamp(2rem, 5vw, 2.8rem); margin: 4px 0 0; }
+        .eyebrow {
+            font-size: .78rem;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+            color: var(--gold);
+            font-weight: 700;
+            text-align: center;
+        }
+        .screen { width: 100%; display: none; flex-direction: column; gap: 20px; }
+        .screen.active { display: flex; }
+        .card {
+            background: rgba(17,18,42,.62);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            backdrop-filter: blur(10px);
+            padding: 28px;
+        }
+        .paper-box {
+            background: var(--paper);
+            color: var(--ink);
+            border-radius: var(--radius-md);
+        }
+        .btn {
+            font-family: 'Manrope', sans-serif;
+            font-weight: 700;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            padding: 14px 26px;
+            font-size: 1rem;
+            transition: transform .15s ease, background-color .15s ease, opacity .15s ease;
+        }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { cursor: not-allowed; opacity: .5; transform: none; }
+        .btn-gold { background: var(--gold); color: var(--ink); box-shadow: 0 6px 18px rgba(240,196,25,.25); }
+        .btn-gold:hover:not(:disabled) { background: #ffd23d; }
+        .btn-ghost { background: rgba(255,255,255,.08); color: var(--paper); border: 1px solid var(--line); }
+        .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,.16); }
+        .btn-detective { background: var(--detective); color: #08131f; }
+        .btn-detective:hover:not(:disabled) { background: #64a4e6; }
+        .btn-danger { background: var(--danger); color: #2a0705; }
+        .btn-danger:hover:not(:disabled) { background: #ef7166; }
+        .btn-block { width: 100%; text-align: center; }
+        input[type="text"], textarea {
+            font-family: 'Manrope', sans-serif;
+            width: 100%;
+            border: none;
+            border-radius: var(--radius-md);
+            padding: 16px;
+            font-size: 1rem;
+            background: var(--paper);
+            color: var(--ink);
+            resize: none;
+        }
+        input[type="text"]:focus, textarea:focus, button:focus-visible {
+            outline: 3px solid var(--gold);
+            outline-offset: 2px;
+        }
+        /* ---------- avatar silhouette ---------- */
+        .avatar { display: block; }
+        .avatar-tile {
+            aspect-ratio: 1 / 1;
+            border-radius: 14px;
+            background: linear-gradient(160deg, #1b1c3f, #0a0b1f);
+            border: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            color: var(--paper-dim);
+        }
+        .avatar-tile.filled { color: var(--gold); border-color: var(--gold); }
+        .avatar-tile.you { color: var(--danger); border-color: var(--danger); box-shadow: 0 0 0 3px rgba(224,85,74,.2); }
+        .avatar-tile svg { width: 60%; height: 60%; }
+        .avatar-tag {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ink);
+            color: var(--gold);
+            font-size: .62rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--gold);
+            white-space: nowrap;
+        }
+        .avatar-tile.eliminated { opacity: .28; filter: grayscale(1); }
+
+        /* ---------- menu / salas ---------- */
+        .stack { display: flex; flex-direction: column; gap: 14px; }
+        .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(255,255,255,.06); padding: 5px; border-radius: 999px; }
+        .tab { border: none; background: transparent; color: var(--paper-dim); font-family: 'Manrope', sans-serif; font-weight: 700; padding: 11px; border-radius: 999px; cursor: pointer; }
+        .tab.active { background: var(--gold); color: var(--ink); }
+        .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        @media (max-width: 480px) { .seg { grid-template-columns: 1fr; } }
+        .seg-btn {
+            text-align: left; cursor: pointer; font-family: 'Manrope', sans-serif;
+            background: rgba(255,255,255,.05); color: var(--paper); border: 2px solid var(--line);
+            border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .seg-btn span { font-size: .75rem; color: var(--paper-dim); line-height: 1.35; }
+        .seg-btn.active { border-color: var(--gold); background: var(--gold-soft); }
+        .room-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+        .room-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 14px; }
+        .room-row .room-info { min-width: 0; }
+        .room-row .room-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .room-row .room-info span { font-size: .75rem; color: var(--paper-dim); }
+        .room-empty { text-align: center; font-size: .85rem; color: var(--paper-dim); padding: 18px 8px; }
+        .room-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .room-code { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 2.2rem; letter-spacing: .18em; color: var(--gold); margin: 2px 0 0; }
+
+        /* ---------- lobby ---------- */
+        #playerGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+            gap: 16px 12px;
+            margin: 22px 0 8px;
+        }
+        .player-slot-name { font-size: .72rem; text-align: center; margin-top: 12px; color: var(--paper-dim); }
+        .player-slot-score { color: var(--gold); font-weight: 700; }
+
+        /* ---------- flip card (role reveal) ---------- */
+        .flip-stage { perspective: 1200px; width: 220px; height: 300px; margin: 8px auto; }
+        .flip-inner {
+            position: relative; width: 100%; height: 100%;
+            transform-style: preserve-3d;
+            transition: transform .9s cubic-bezier(.2,.8,.2,1);
+        }
+        .flip-inner.flipped { transform: rotateY(180deg); }
+        .flip-face {
+            position: absolute; inset: 0;
+            border-radius: 18px;
+            backface-visibility: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 18px;
+            text-align: center;
+        }
+        .flip-front {
+            background: repeating-linear-gradient(135deg, #171a52, #171a52 10px, #1c1f63 10px, #1c1f63 20px);
+            border: 2px solid var(--gold);
+        }
+        .flip-front::after {
+            content: "?";
+            font-family: 'Playfair Display', serif;
+            font-size: 5rem;
+            color: var(--gold);
+            opacity: .8;
+        }
+        .flip-back {
+            background: var(--paper);
+            color: var(--ink);
+            transform: rotateY(180deg);
+            border: 2px solid var(--gold);
+        }
+        #roleBigLabel { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.6rem; margin: 0; }
+        #roleHint { font-size: .85rem; margin-top: 10px; line-height: 1.4; }
+        .theme-pill {
+            margin: 6px auto 0;
+            padding: 14px 28px;
+            border-radius: 999px;
+            background: #0d0e24;
+            border: 1px solid var(--line);
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+            font-size: 1.3rem;
+            text-align: center;
+            color: var(--gold);
+        }
+
+        /* ---------- fatos ---------- */
+        #factInput { min-height: 150px; }
+        .facts-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .clock-icon { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--gold); position: relative; flex: none; }
+        .clock-icon::before, .clock-icon::after {
+            content: ""; position: absolute; background: var(--gold); left: 50%; bottom: 50%;
+            transform-origin: bottom center;
+        }
+        .clock-icon::before { width: 2px; height: 12px; transform: translateX(-50%) rotate(45deg); animation: tick 6s linear infinite; }
+        .clock-icon::after { width: 2px; height: 8px; transform: translateX(-50%) rotate(210deg); animation: tick 24s linear infinite; }
+        @keyframes tick { to { transform: translateX(-50%) rotate(calc(1turn + 45deg)); } }
+
+        #apresentacaoBarra.rodando {
+            animation: contagem 10s linear forwards;
+        }
+        @keyframes contagem { from { width: 100%; } to { width: 0%; } }
+        @media (prefers-reduced-motion: reduce) {
+            #apresentacaoBarra.rodando { animation: none; }
+        }
+
+        /* ---------- votação / discussão ---------- */
+        .round-topbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .pts-badge {
+            background: var(--gold); color: var(--ink); font-weight: 800;
+            border-radius: 999px; padding: 8px 18px; font-size: .85rem;
+        }
+        .votacao-layout { display: grid; grid-template-columns: 92px 1fr; gap: 20px; align-items: start; }
+        @media (max-width: 640px) { .votacao-layout { grid-template-columns: 1fr; } .sidebar { flex-direction: row !important; overflow-x: auto; } }
+        .sidebar { display: flex; flex-direction: column; gap: 10px; }
+        .sidebar .avatar-tile { width: 100%; }
+        .facts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+        .fact-card {
+            padding: 14px 16px 34px;
+            position: relative;
+            box-shadow: 0 6px 14px rgba(0,0,0,.25);
+        }
+        .fact-card .fact-name { font-weight: 800; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; color: #6b5c14; margin: 0 0 6px; }
+        .fact-card .fact-text { margin: 0; font-size: .95rem; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; max-height: 180px; overflow-y: auto; }
+        .fact-card { overflow-wrap: anywhere; word-break: break-word; }
+        .fact-card.self { outline: 3px solid var(--danger); }
+        .fact-card.eliminated { opacity: .35; }
+        .fact-actions { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+        .mini-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
+            font-weight: 800; font-size: .85rem; display: flex; align-items: center; justify-content: center;
+        }
+        .mini-btn.vote { background: var(--ink); color: var(--gold); }
+        .mini-btn.vote:hover:not(:disabled) { background: #23254f; }
+        .mini-btn.vote.selected { background: var(--success); color: #06210f; }
+        .mini-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        .special-panel { border-radius: var(--radius-md); padding: 16px 18px; border: 1px solid; }
+        .special-panel.detective { border-color: var(--detective); background: rgba(77,144,217,.1); }
+        .special-panel.impostor { border-color: var(--danger); background: rgba(224,85,74,.1); }
+        .special-panel h4 { margin: 0 0 10px; font-size: .95rem; }
+        .special-panel .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip-btn {
+            border: none; border-radius: 999px; padding: 8px 14px; font-size: .82rem; font-weight: 700; cursor: pointer;
+        }
+        .chip-btn.detective-chip { background: var(--detective); color: #08131f; }
+        .chip-btn.impostor-chip { background: var(--danger); color: #2a0705; }
+        .chip-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        .bottom-actions { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 4px; }
+        .icon-btn {
+            width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem;
+        }
+        .icon-btn.info { background: transparent; border: 2px solid var(--gold); color: var(--gold); }
+        .icon-btn.chat-toggle { background: var(--gold); color: var(--ink); }
+
+        /* chat */
+        #chatPanel { display: none; }
+        #chatPanel.open { display: block; }
+        #chatMessages { height: 220px; overflow-y: auto; padding: 10px; }
+        .message-sent, .message-received { max-width: 85%; padding: 8px 12px; border-radius: 12px; margin: 6px 0; font-size: .88rem; }
+        .message-sent { margin-left: auto; background: var(--gold); color: var(--ink); }
+        .message-received { background: #23254f; color: var(--paper); }
+        .message-sender { display: block; font-size: .68rem; font-weight: 800; opacity: .75; margin-bottom: 2px; }
+
+        /* ---------- resultado ---------- */
+        .result-avatar { width: 150px; height: 150px; margin: 0 auto; border-radius: 20px; background: linear-gradient(160deg,#2a0705,#4a0f0b); border: 2px solid var(--danger); display:flex; align-items:center; justify-content:center; }
+        .result-avatar svg { width: 68%; height: 68%; color: var(--danger); }
+        #mentirosoNomeGrande { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.6rem; margin: 14px 0 4px; }
+        .outcome-pill { background: var(--ink); border-radius: 999px; padding: 16px 24px; font-weight: 700; text-align: center; }
+        .outcome-pill .green { color: var(--success); }
+        .outcome-pill .red { color: var(--danger); }
+        .outcome-pill .blue { color: var(--detective); }
+        #eliminatedNotice { text-align: center; font-size: .85rem; font-style: italic; color: var(--paper-dim); }
+        #errorBox { text-align: center; color: var(--danger); font-weight: 700; }
+        .hidden { display: none !important; }
+
+        /* rules modal */
+        #rulesModal {
+            position: fixed; inset: 0; background: rgba(3,3,12,.72);
+            display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+        }
+        #rulesModal.open { display: flex; }
+        #rulesModal .card { max-width: 480px; }
+        #rulesModal ul { padding-left: 18px; line-height: 1.6; font-size: .9rem; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .flip-inner { transition: none; }
+            .clock-icon::before, .clock-icon::after { animation: none; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="app">
+        <div>
+            <p class="eyebrow">Um jogo de blefe e dedução</p>
+            <h1 class="wordmark">O <span class="accent">Mentiroso</span></h1>
+        </div>
+
+        <!-- MENU: criar ou entrar em sala -->
+        <div id="menuScreen" class="screen active card" style="max-width:560px;">
+            <div>
+                <p class="eyebrow" style="text-align:left; margin-bottom:8px;">Seu nome</p>
+                <input type="text" id="playerNameInput" placeholder="Como quer ser chamado?" maxlength="15">
+            </div>
+
+            <div class="tabs" role="tablist">
+                <button id="tabCriar" class="tab active" role="tab" onclick="mostrarAba('criar')">Criar sala</button>
+                <button id="tabEntrar" class="tab" role="tab" onclick="mostrarAba('entrar')">Entrar em sala</button>
+            </div>
+
+            <div id="painelCriar" class="stack">
+                <div class="seg">
+                    <button id="segPublica" class="seg-btn active" onclick="definirPrivacidade(true)">
+                        <strong>🌐 Pública</strong><span>Aparece na lista; qualquer um pode entrar</span>
+                    </button>
+                    <button id="segPrivada" class="seg-btn" onclick="definirPrivacidade(false)">
+                        <strong>🔒 Privada</strong><span>Só entra quem tiver o código</span>
+                    </button>
+                </div>
+                <button id="criarBtn" class="btn btn-gold btn-block" onclick="criarSala()">Criar sala</button>
+            </div>
+
+            <div id="painelEntrar" class="stack hidden">
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="codigoInput" placeholder="CÓDIGO" maxlength="5" autocomplete="off" style="text-transform:uppercase; letter-spacing:.3em; text-align:center; font-weight:800;" onkeydown="if(event.key === 'Enter') entrarPorCodigo()">
+                    <button id="entrarCodigoBtn" class="btn btn-gold" onclick="entrarPorCodigo()">Entrar</button>
+                </div>
+                <p class="eyebrow" style="text-align:left; margin-top:6px;">Salas públicas</p>
+                <div id="listaSalas" class="room-list"></div>
+            </div>
+        </div>
+
+        <!-- LOBBY DA SALA -->
+        <div id="lobbyScreen" class="screen card" style="max-width:560px;">
+            <div class="room-head">
+                <div>
+                    <p class="eyebrow" style="text-align:left;">Código da sala · <span id="salaTipo"></span></p>
+                    <p id="salaCodigo" class="room-code"></p>
+                </div>
+                <button id="copiarBtn" class="btn btn-ghost" onclick="copiarCodigo()">Copiar</button>
+            </div>
+
+            <div>
+                <p class="eyebrow" style="text-align:left;">Jogadores na sala (<span id="playerCount">0</span>/12)</p>
+                <div id="playerGrid"></div>
+                <p id="lobbyMessage" style="text-align:center; color: var(--gold); font-size:.85rem;"></p>
+            </div>
+
+            <button id="startButton" onclick="startGame()" class="btn btn-ghost btn-block" disabled>Começar</button>
+            <button class="btn btn-ghost btn-block" onclick="sairDaSala()">Sair da sala</button>
+        </div>
+
+        <!-- ROLE / TEMA -->
+        <div id="roleScreen" class="screen card" style="max-width:480px; align-items:center;">
+            <div class="flip-stage">
+                <div class="flip-inner" id="flipInner">
+                    <div class="flip-face flip-front"></div>
+                    <div class="flip-face flip-back">
+                        <p id="roleBigLabel"></p>
+                        <p id="roleHint"></p>
+                    </div>
+                </div>
+            </div>
+            <p class="eyebrow">O tema é</p>
+            <div class="theme-pill" id="themeDisplay"></div>
+        </div>
+
+        <!-- FATOS -->
+        <div id="factsScreen" class="screen card" style="max-width:560px;">
+            <p class="eyebrow" id="factsRoleBadge" style="text-align:left;"></p>
+            <p class="eyebrow" style="text-align:left;">Escreva seu fato ou curiosidade</p>
+            <textarea id="factInput" placeholder="Escreva seu fato ou sua mentira..." maxlength="600" oninput="atualizarContadorFato()"></textarea>
+            <p style="text-align:right; font-size:.75rem; color:var(--paper-dim); margin:-10px 0 0;"><span id="factCharCount">0</span>/600</p>
+            <p id="factFeedback" class="hidden" role="alert" style="margin:0; padding:10px 14px; border-radius:var(--radius-md); background:rgba(224,85,74,.14); border:1px solid var(--danger); font-size:.85rem; line-height:1.4;"></p>
+            <div class="facts-footer">
+                <span style="font-size:.85rem; color:var(--paper-dim);">Tema: <strong id="factsThemeDisplay" style="color:var(--gold);"></strong></span>
+                <span class="clock-icon" aria-hidden="true"></span>
+                <button id="submitFactButton" onclick="submitFact()" class="btn btn-gold">Enviar</button>
+            </div>
+        </div>
+
+        <!-- VOTAÇÃO / DISCUSSÃO -->
+        <!-- APRESENTAÇÃO DAS CURIOSIDADES (uma de cada vez, antes da tela de votação) -->
+        <div id="apresentacaoScreen" class="screen card" style="max-width:520px; align-items:center; text-align:center;">
+            <p class="eyebrow" id="apresentacaoProgresso"></p>
+            <p class="eyebrow" style="color:var(--gold); font-size:1rem;" id="apresentacaoNome"></p>
+            <p style="font-size:1.3rem; line-height:1.5; min-height:80px; max-height:220px; overflow-y:auto; overflow-wrap:anywhere; word-break:break-word;" id="apresentacaoTexto"></p>
+            <div style="width:100%; height:6px; background:rgba(255,255,255,.1); border-radius:999px; overflow:hidden;">
+                <div id="apresentacaoBarra" style="height:100%; width:100%; background:var(--gold);"></div>
+            </div>
+            <p style="font-size:.8rem; color:var(--paper-dim);" id="apresentacaoTimerWrap"><span id="apresentacaoTimer">10</span>s</p>
+            <button id="apresentacaoPularBtn" class="btn btn-ghost" onclick="proximaApresentacao()">Pular ⏭</button>
+        </div>
+
+        <div id="votacaoScreen" class="screen" style="gap:16px;">
+            <div class="round-topbar">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div class="theme-pill" style="margin:0; padding:10px 20px; font-size:1rem;" id="votacaoThemeDisplay"></div>
+                    <p class="eyebrow" id="votacaoRoleBadge" style="margin:0;"></p>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="pts-badge">PTS: <span id="ptsValue">0</span></span>
+                    <button class="icon-btn chat-toggle" onclick="toggleChat()" title="Chat da discussão">💬</button>
+                    <button class="icon-btn info" onclick="toggleRules()" title="Como jogar">?</button>
+                </div>
+            </div>
+
+            <div class="votacao-layout">
+                <div class="sidebar" id="sidebarAvatars"></div>
+
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div class="card" id="chatPanel">
+                        <p class="eyebrow" style="text-align:left;">Chat da discussão</p>
+                        <div id="chatMessages" class="paper-box"></div>
+                        <div style="display:flex; gap:8px; margin-top:10px;">
+                            <input type="text" id="chatInput" placeholder="Sua mensagem..." onkeydown="if(event.key === 'Enter') sendMessage()">
+                            <button onclick="sendMessage()" class="btn btn-ghost">Enviar</button>
+                        </div>
+                    </div>
+
+                    <p id="voteInstruction" class="eyebrow" style="text-align:left;">Toque no ✓ de quem você acha que é o Mentiroso</p>
+                    <div class="facts-grid" id="factsList"></div>
+
+                    <div id="detectiveActionArea" class="special-panel detective hidden">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                            <h4 style="margin:0;">Detetive</h4>
+                            <button id="ativarDeducaoBtn" class="icon-btn" style="background:var(--detective); color:#08131f;" onclick="ativarDeducao()" title="Usar habilidade: deduzir o Mentiroso" aria-label="Usar habilidade: deduzir o Mentiroso">🕵️</button>
+                        </div>
+                        <div class="chips hidden" id="deduceButtons"></div>
+                    </div>
+
+                    <div id="impostorActionArea" class="special-panel impostor hidden">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                            <h4 style="margin:0;">Impostor</h4>
+                            <button id="ativarMatarBtn" class="icon-btn" style="background:var(--danger); color:#2a0705;" onclick="ativarMatar()" title="Usar habilidade: eliminar suspeito" aria-label="Usar habilidade: eliminar suspeito">🔪</button>
+                        </div>
+                        <div class="chips hidden" id="killButtons"></div>
+                        <p id="detetiveConhecidoAviso" class="hidden" style="margin:10px 0 0; font-size:.82rem; color:var(--gold);"></p>
+                    </div>
+
+                    <p id="eliminatedNotice" class="hidden">Você foi eliminado desta rodada e não pode mais agir.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTADO -->
+        <div id="resultScreen" class="screen card" style="max-width:480px; align-items:center; text-align:center;">
+            <p class="eyebrow">O mentiroso era...</p>
+            <div class="result-avatar">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="50" cy="60" rx="20" ry="24" fill="currentColor"/>
+                    <path d="M18 42 Q50 20 82 42 L88 49 Q50 36 12 49 Z" fill="currentColor"/>
+                    <rect x="36" y="26" width="28" height="15" rx="3" fill="currentColor"/>
+                    <path d="M64 66 L84 44 L90 50 L70 74 Z" fill="currentColor"/>
+                </svg>
+            </div>
+            <p id="mentirosoNomeGrande"></p>
+            <div class="outcome-pill" id="resultText"></div>
+            <div id="detetiveVoteReveal" class="hidden" style="font-size:.85rem; color:var(--paper-dim);"></div>
+            <button onclick="voltarAoLobby()" class="btn btn-gold btn-block">Voltar ao lobby</button>
+        </div>
+
+        <p id="errorBox" class="hidden"></p>
+    </div>
+
+    <div id="rulesModal">
+        <div class="card">
+            <p class="eyebrow" style="text-align:left;">Como jogar</p>
+            <ul>
+                <li>Todo mundo escreve um fato (ou mentira) sobre o tema sorteado.</li>
+                <li>O Mentiroso não sabe o tema de verdade — precisa disfarçar.</li>
+                <li>O Detetive sabe quem é quem votar certo, mas se apostar tudo numa dedução direta e errar, ninguém pontua.</li>
+                <li>O Mentiroso pode tentar eliminar em segredo quem ele suspeita ser o Detetive — se errar, se revela.</li>
+            </ul>
+            <button class="btn btn-ghost btn-block" onclick="toggleRules()">Fechar</button>
+        </div>
+    </div>
+
+    <script type="module">
+        //Variáveis de Jogo
+        const socket = io();
+        let myId = null;
+        let myName = "";
+        let myRole = null;
+        let players = [];
+        let facts = {};
+        let sessionToken = null;
+        const ESTADO_SALA = {
+            LOBBY: 'lobby',
+            ROLE: 'espera-role',
+            FATOS: 'coletandoFatos',
+            VOTACAO: 'votando',
+            RESULTADO: 'resultado'
+        };
+
+        function avatarSvg() {
+            return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="50" cy="58" rx="20" ry="24" fill="currentColor"/>
+                <path d="M20 40 Q50 20 80 40 L86 46 Q50 34 14 46 Z" fill="currentColor"/>
+                <rect x="38" y="26" width="24" height="14" rx="3" fill="currentColor"/>
+            </svg>`;
+        }
+
+        // FUNÇÕES DE INTERFACE (UI)
+
+        function updateScreen(estado) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+
+            if (estado === ESTADO_SALA.VOTACAO) {
+                iniciarApresentacao();
+                return;
+            }
+
+            const map = {
+                [ESTADO_SALA.LOBBY]: 'lobbyScreen',
+                [ESTADO_SALA.ROLE]: 'roleScreen',
+                [ESTADO_SALA.FATOS]: 'factsScreen',
+                [ESTADO_SALA.RESULTADO]: 'resultScreen'
+            };
+            const id = map[estado];
+            if (!id) return;
+            document.getElementById(id).classList.add('active');
+
+            if (estado === ESTADO_SALA.FATOS) {
+                document.getElementById('factInput').disabled = false;
+                document.getElementById('factInput').value = '';
+                document.getElementById('factCharCount').textContent = '0';
+                document.getElementById('factFeedback').classList.add('hidden');
+                document.getElementById('submitFactButton').disabled = false;
+                document.getElementById('submitFactButton').textContent = 'Enviar';
+            }
+        }
+
+        // ---------- Apresentação sequencial das curiosidades ----------
+        let apresentacaoOrdem = [];
+        let apresentacaoIndex = 0;
+        let apresentacaoTimer = null;
+
+        function iniciarApresentacao() {
+            clearInterval(apresentacaoTimer);
+            document.getElementById('apresentacaoScreen').classList.add('active');
+            apresentacaoOrdem = players.filter(p => Object.keys(facts).includes(p.id));
+            apresentacaoIndex = 0;
+            mostrarApresentacaoAtual();
+        }
+
+        function mostrarApresentacaoAtual() {
+            clearInterval(apresentacaoTimer);
+
+            if (apresentacaoIndex >= apresentacaoOrdem.length) {
+                mostrarAguardandoOutros();
+                socket.emit('apresentacaoConcluida');
+                return;
+            }
+
+            document.getElementById('apresentacaoPularBtn').classList.remove('hidden');
+            document.getElementById('apresentacaoTimerWrap').classList.remove('hidden');
+
+            const jogador = apresentacaoOrdem[apresentacaoIndex];
+            document.getElementById('apresentacaoProgresso').textContent = `Curiosidade ${apresentacaoIndex + 1} de ${apresentacaoOrdem.length}`;
+            document.getElementById('apresentacaoNome').textContent = jogador.id === myId ? `${jogador.nome} (você)` : jogador.nome;
+            document.getElementById('apresentacaoTexto').textContent = facts[jogador.id];
+
+            const barra = document.getElementById('apresentacaoBarra');
+            barra.classList.remove('rodando');
+            void barra.offsetWidth; // força reflow pra reiniciar a animação
+            barra.classList.add('rodando');
+
+            let restante = 10;
+            const timerLabel = document.getElementById('apresentacaoTimer');
+            timerLabel.textContent = restante;
+            apresentacaoTimer = setInterval(() => {
+                restante--;
+                timerLabel.textContent = Math.max(restante, 0);
+                if (restante <= 0) {
+                    proximaApresentacao();
+                }
+            }, 1000);
+        }
+
+        function mostrarAguardandoOutros() {
+            document.getElementById('apresentacaoProgresso').textContent = 'Você já viu todas as curiosidades';
+            document.getElementById('apresentacaoNome').textContent = '';
+            document.getElementById('apresentacaoTexto').textContent = 'Aguardando os outros jogadores terminarem...';
+            document.getElementById('apresentacaoBarra').classList.remove('rodando');
+            document.getElementById('apresentacaoTimerWrap').classList.add('hidden');
+            document.getElementById('apresentacaoPularBtn').classList.add('hidden');
+        }
+
+        socket.on('liberarVotacao', () => {
+            clearInterval(apresentacaoTimer);
+            document.getElementById('apresentacaoScreen').classList.remove('active');
+            document.getElementById('votacaoScreen').classList.add('active');
+            updatePtsBadge();
+            document.getElementById('chatMessages').innerHTML = '';
+            displayFactsAndVoting();
+        });
+
+        function proximaApresentacao() {
+            apresentacaoIndex++;
+            mostrarApresentacaoAtual();
+        }
+        window.proximaApresentacao = proximaApresentacao;
+
+        function updatePtsBadge() {
+            const me = players.find(p => p.id === myId);
+            document.getElementById('ptsValue').textContent = me ? me.score : 0;
+        }
+
+        function displayPlayerList(playerList) {
+            players = playerList.sort((a, b) => b.score - a.score);
+            const grid = document.getElementById('playerGrid');
+            grid.innerHTML = '';
+
+            players.forEach(player => {
+                const tile = document.createElement('div');
+                tile.className = 'avatar-tile filled' + (player.id === myId ? ' you' : '');
+                tile.innerHTML = avatarSvg();
+                const wrap = document.createElement('div');
+                wrap.appendChild(tile);
+                const caption = document.createElement('p');
+                caption.className = 'player-slot-name';
+                caption.innerHTML = `${player.host ? '👑 ' : ''}${player.nome}${player.id === myId ? ' (Você)' : ''}<br><span class="player-slot-score">${player.score} pts</span>`;
+                wrap.appendChild(caption);
+                grid.appendChild(wrap);
+            });
+
+            document.getElementById('playerCount').textContent = playerList.length;
+
+            const souAnfitriao = playerList.some(p => p.id === myId && p.host);
+            const startButton = document.getElementById('startButton');
+            const lobbyMessage = document.getElementById('lobbyMessage');
+            const podeIniciar = souAnfitriao && playerList.length >= 2;
+
+            startButton.disabled = !podeIniciar;
+            startButton.classList.toggle('btn-gold', podeIniciar);
+            startButton.classList.toggle('btn-ghost', !podeIniciar);
+            startButton.classList.toggle('hidden', !souAnfitriao);
+
+            if (!souAnfitriao) {
+                lobbyMessage.textContent = 'Aguardando o anfitrião iniciar a partida...';
+            } else if (playerList.length < 2) {
+                lobbyMessage.textContent = 'Mínimo de 2 jogadores para iniciar.';
+            } else {
+                lobbyMessage.textContent = '';
+            }
+            updatePtsBadge();
+        }
+
+        function renderSidebar() {
+            const sidebar = document.getElementById('sidebarAvatars');
+            sidebar.innerHTML = '';
+            players.forEach((player, i) => {
+                if (!Object.keys(facts).includes(player.id)) return;
+                const tile = document.createElement('div');
+                tile.className = 'avatar-tile filled' + (player.id === myId ? ' you' : '');
+                tile.id = `sidebarAvatar-${player.id}`;
+                tile.innerHTML = avatarSvg() + `<span class="avatar-tag">${player.id === myId ? 'VOCÊ' : (i + 1)}</span>`;
+                sidebar.appendChild(tile);
+            });
+        }
+
+        let detetiveConhecidoId = null; // só é preenchido no cliente do impostor, quando o detetive erra a dedução
+
+        function displayFactsAndVoting() {
+            const list = document.getElementById('factsList');
+            const deduceButtons = document.getElementById('deduceButtons');
+            const killButtons = document.getElementById('killButtons');
+            list.innerHTML = '';
+            deduceButtons.innerHTML = '';
+            killButtons.innerHTML = '';
+
+            document.getElementById('detectiveActionArea').classList.toggle('hidden', myRole !== 'detetive');
+            document.getElementById('impostorActionArea').classList.toggle('hidden', myRole !== 'mentiroso');
+            document.getElementById('eliminatedNotice').classList.add('hidden');
+
+            // Reseta os botões de ativação de habilidade (ficam escondidos até o jogador clicar)
+            document.getElementById('ativarDeducaoBtn').classList.remove('hidden');
+            document.getElementById('deduceButtons').classList.add('hidden');
+            document.getElementById('ativarMatarBtn').classList.remove('hidden');
+            document.getElementById('killButtons').classList.add('hidden');
+            document.getElementById('detetiveConhecidoAviso').classList.add('hidden');
+
+            const factKeys = Object.keys(facts);
+
+            players.forEach(player => {
+                if (!factKeys.includes(player.id)) return;
+
+                const card = document.createElement('div');
+                card.className = 'fact-card paper-box' + (player.id === myId ? ' self' : '');
+                card.id = `factLi-${player.id}`;
+                card.innerHTML = `<p class="fact-name">${player.nome}${player.id === myId ? ' (você)' : ''}</p><p class="fact-text">${facts[player.id]}</p>`;
+
+                if (player.id !== myId) {
+                    const actions = document.createElement('div');
+                    actions.className = 'fact-actions';
+
+                    const voteBtn = document.createElement('button');
+                    voteBtn.className = 'mini-btn vote';
+                    voteBtn.textContent = '✓';
+                    voteBtn.title = `Votar em ${player.nome}`;
+                    voteBtn.id = `voteBtn-${player.id}`;
+                    voteBtn.onclick = () => submitVote(player.id);
+                    actions.appendChild(voteBtn);
+
+                    card.appendChild(actions);
+
+                    if (myRole === 'detetive') {
+                        const deduceBtn = document.createElement('button');
+                        deduceBtn.className = 'chip-btn detective-chip';
+                        deduceBtn.textContent = player.nome;
+                        deduceBtn.id = `deduceBtn-${player.id}`;
+                        deduceBtn.onclick = () => detectiveDeduce(player.id);
+                        deduceButtons.appendChild(deduceBtn);
+                    }
+                    if (myRole === 'mentiroso') {
+                        const killBtn = document.createElement('button');
+                        killBtn.className = 'chip-btn impostor-chip';
+                        killBtn.textContent = player.id === detetiveConhecidoId ? `🔎 ${player.nome} (Detetive!)` : player.nome;
+                        killBtn.id = `killBtn-${player.id}`;
+                        killBtn.onclick = () => impostorKill(player.id);
+                        killButtons.appendChild(killBtn);
+                    }
+                }
+                list.appendChild(card);
+            });
+
+            renderSidebar();
+        }
+
+        function ativarDeducao() {
+            document.getElementById('ativarDeducaoBtn').classList.add('hidden');
+            document.getElementById('deduceButtons').classList.remove('hidden');
+        }
+        function ativarMatar() {
+            document.getElementById('ativarMatarBtn').classList.add('hidden');
+            document.getElementById('killButtons').classList.remove('hidden');
+        }
+        window.ativarDeducao = ativarDeducao;
+        window.ativarMatar = ativarMatar;
+
+        function toggleChat() {
+            document.getElementById('chatPanel').classList.toggle('open');
+        }
+        function toggleRules() {
+            document.getElementById('rulesModal').classList.toggle('open');
+        }
+        window.toggleChat = toggleChat;
+        window.toggleRules = toggleRules;
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (message === '') return;
+            socket.emit('chatMessage', message);
+            input.value = '';
+        }
+
+        function displayMessage({ sender, text }) {
+            const chatMessages = document.getElementById('chatMessages');
+            const isMe = sender === myName;
+            const div = document.createElement('div');
+            div.className = isMe ? 'message-sent' : 'message-received';
+            div.innerHTML = `<span class="message-sender">${isMe ? 'Você' : sender}</span>`;
+            const p = document.createElement('p');
+            p.style.margin = '0';
+            p.textContent = text;
+            div.appendChild(p);
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function startGame() {
+            socket.emit('startGame');
+        }
+
+        function atualizarContadorFato() {
+            const texto = document.getElementById('factInput').value;
+            document.getElementById('factCharCount').textContent = texto.length;
+        }
+        window.atualizarContadorFato = atualizarContadorFato;
+
+        function submitFact() {
+            const fact = document.getElementById('factInput').value.trim();
+            if (!fact) return;
+            document.getElementById('factFeedback').classList.add('hidden');
+            socket.emit('submitFact', fact);
+            document.getElementById('factInput').disabled = true;
+            document.getElementById('submitFactButton').disabled = true;
+            document.getElementById('submitFactButton').textContent = 'Verificando...';
+        }
+
+        // Curiosidade aceita (pela IA ou sem verificação): agora é só esperar os outros
+        socket.on('fatoAceito', () => {
+            document.getElementById('factFeedback').classList.add('hidden');
+            document.getElementById('submitFactButton').textContent = 'Aguardando outros...';
+        });
+
+        // Curiosidade rejeitada: reabre o campo pra o jogador corrigir
+        socket.on('fatoRejeitado', ({ motivo, tentativa, max }) => {
+            const feedback = document.getElementById('factFeedback');
+            feedback.textContent = tentativa ? `${motivo} (rejeição ${tentativa} de ${max})` : motivo;
+            feedback.classList.remove('hidden');
+            document.getElementById('factInput').disabled = false;
+            document.getElementById('factInput').focus();
+            document.getElementById('submitFactButton').disabled = false;
+            document.getElementById('submitFactButton').textContent = 'Enviar';
+        });
+
+        function submitVote(votadoId) {
+            socket.emit('submitVote', votadoId);
+            document.querySelectorAll('.mini-btn.vote').forEach(btn => btn.disabled = true);
+            const votedButton = document.getElementById(`voteBtn-${votadoId}`);
+            if (votedButton) votedButton.classList.add('selected');
+            document.getElementById('voteInstruction').textContent = 'Seu voto foi registrado. Aguardando os outros...';
+        }
+
+        function detectiveDeduce(alvoId) {
+            socket.emit('detectiveDeduce', alvoId);
+            document.querySelectorAll('#deduceButtons button, .mini-btn.vote').forEach(b => b.disabled = true);
+        }
+
+        function impostorKill(alvoId) {
+            socket.emit('impostorKill', alvoId);
+            document.querySelectorAll('#killButtons button').forEach(b => b.disabled = true);
+        }
+
+        socket.on('deducaoErrada', () => {
+            document.getElementById('ativarDeducaoBtn').classList.add('hidden');
+            document.getElementById('deduceButtons').classList.add('hidden');
+            const aviso = document.createElement('p');
+            aviso.style.cssText = 'font-size:.82rem; color:var(--danger); margin-top:10px;';
+            aviso.textContent = 'Você errou a dedução! Ainda pode votar normalmente com os outros.';
+            document.getElementById('detectiveActionArea').appendChild(aviso);
+        });
+
+        socket.on('detetiveRevelado', ({ id, nome }) => {
+            detetiveConhecidoId = id;
+            const aviso = document.getElementById('detetiveConhecidoAviso');
+            aviso.textContent = `🔎 O Detetive errou uma dedução e você descobriu quem ele é: ${nome}!`;
+            aviso.classList.remove('hidden');
+            // Atualiza os chips de eliminação já visíveis, se o painel já estiver montado
+            const killBtn = document.getElementById(`killBtn-${id}`);
+            if (killBtn) killBtn.textContent = `🔎 ${nome} (Detetive!)`;
+        });
+
+        socket.on('jogadorEliminado', ({ id }) => {
+            const voteBtn = document.getElementById(`voteBtn-${id}`);
+            if (voteBtn) voteBtn.remove();
+            const deduceBtn = document.getElementById(`deduceBtn-${id}`);
+            if (deduceBtn) deduceBtn.remove();
+            const killBtn = document.getElementById(`killBtn-${id}`);
+            if (killBtn) killBtn.remove();
+
+            const factLi = document.getElementById(`factLi-${id}`);
+            if (factLi) factLi.classList.add('eliminated');
+            const sideAvatar = document.getElementById(`sidebarAvatar-${id}`);
+            if (sideAvatar) sideAvatar.classList.add('eliminated');
+
+            if (id === myId) {
+                document.getElementById('eliminatedNotice').classList.remove('hidden');
+                document.getElementById('detectiveActionArea').classList.add('hidden');
+                document.getElementById('impostorActionArea').classList.add('hidden');
+            }
+        });
+
+        socket.on('gameState', ({ estado, jogadorId }) => {
+            if (jogadorId) myId = jogadorId;
+            updateScreen(estado);
+        });
+
+        socket.on('playerListUpdate', displayPlayerList);
+
+        socket.on('sessionToken', (token) => { sessionToken = token; });
+
+        socket.on('roleAssignment', ({ role, tema }) => {
+            myRole = role;
+            detetiveConhecidoId = null;
+            const roleBigLabel = document.getElementById('roleBigLabel');
+            const roleHint = document.getElementById('roleHint');
+            const flipInner = document.getElementById('flipInner');
+            const flipBack = flipInner.querySelector('.flip-back');
+
+            flipInner.classList.remove('flipped');
+
+            const config = {
+                mentiroso: { label: 'VOCÊ É O MENTIROSO!', color: 'var(--danger)', hint: 'Ninguém pode saber. Disfarce seu fato e, se suspeitar do Detetive, elimine-o em segredo.' },
+                detetive: { label: 'VOCÊ É O DETETIVE!', color: 'var(--detective)', hint: 'Você pode votar normal ou apostar tudo numa dedução direta — acertar dobra seus pontos, errar zera a rodada.' },
+                inocente: { label: 'VOCÊ É INOCENTE!', color: 'var(--success)', hint: 'Preste atenção nos fatos dos outros e vote em quem parece estar mentindo.' }
+            };
+            const c = config[role] || config.inocente;
+            roleBigLabel.textContent = c.label;
+            roleBigLabel.style.color = c.color;
+            roleHint.textContent = c.hint;
+            flipBack.style.borderColor = c.color;
+
+            const badgeHtml = `Seu papel: <strong style="color:${c.color}">${c.label.replace('VOCÊ É ', '').replace('!', '')}</strong>`;
+            document.getElementById('factsRoleBadge').innerHTML = badgeHtml;
+            document.getElementById('votacaoRoleBadge').innerHTML = badgeHtml;
+
+            document.getElementById('themeDisplay').textContent = tema;
+            document.getElementById('factsThemeDisplay').textContent = tema;
+            document.getElementById('votacaoThemeDisplay').textContent = tema;
+
+            requestAnimationFrame(() => setTimeout(() => flipInner.classList.add('flipped'), 350));
+        });
+
+        socket.on('allFactsCollected', (data) => {
+            facts = data.fatos;
+            players = data.jogadores.map(j => {
+                const found = players.find(p => p.id === j.id);
+                return found ? { ...found, ...j } : { ...j, score: 0 };
+            });
+        });
+
+        socket.on('receiveMessage', displayMessage);
+
+        socket.on('error', (message) => {
+            mostrarErro(`Erro: ${message}`);
+            definirMenuOcupado(false);
+        });
+
+        // ---------- Menu: criar / entrar em sala ----------
+        let salaPublica = true;
+        let salaCodigo = null;
+
+        function mostrarErro(texto) {
+            const errorBox = document.getElementById('errorBox');
+            errorBox.textContent = texto;
+            errorBox.classList.remove('hidden');
+        }
+        function limparErro() {
+            document.getElementById('errorBox').classList.add('hidden');
+        }
+        function definirMenuOcupado(ocupado) {
+            ['playerNameInput', 'codigoInput', 'criarBtn', 'entrarCodigoBtn'].forEach(id => {
+                document.getElementById(id).disabled = ocupado;
+            });
+            document.querySelectorAll('#listaSalas button').forEach(b => b.disabled = ocupado);
+        }
+
+        function mostrarAba(aba) {
+            const criar = aba === 'criar';
+            document.getElementById('tabCriar').classList.toggle('active', criar);
+            document.getElementById('tabEntrar').classList.toggle('active', !criar);
+            document.getElementById('painelCriar').classList.toggle('hidden', !criar);
+            document.getElementById('painelEntrar').classList.toggle('hidden', criar);
+            limparErro();
+            if (!criar) socket.emit('listRooms');
+        }
+
+        function definirPrivacidade(publica) {
+            salaPublica = publica;
+            document.getElementById('segPublica').classList.toggle('active', publica);
+            document.getElementById('segPrivada').classList.toggle('active', !publica);
+        }
+
+        function lerNome() {
+            const nome = document.getElementById('playerNameInput').value.trim();
+            if (nome.length < 3) {
+                mostrarErro('Digite um nome com pelo menos 3 caracteres.');
+                return null;
+            }
+            myName = nome;
+            return nome;
+        }
+
+        function criarSala() {
+            const nome = lerNome();
+            if (!nome) return;
+            limparErro();
+            definirMenuOcupado(true);
+            socket.emit('createRoom', { nome, publica: salaPublica, token: sessionToken });
+        }
+
+        function entrarNaSala(codigo) {
+            const nome = lerNome();
+            if (!nome) return;
+            limparErro();
+            definirMenuOcupado(true);
+            socket.emit('joinRoom', { nome, codigo, token: sessionToken });
+        }
+
+        function entrarPorCodigo() {
+            const codigo = document.getElementById('codigoInput').value.trim().toUpperCase();
+            if (codigo.length < 4) {
+                mostrarErro('Digite o código da sala.');
+                return;
+            }
+            entrarNaSala(codigo);
+        }
+
+        function renderListaSalas(lista) {
+            const el = document.getElementById('listaSalas');
+            el.innerHTML = '';
+            if (!lista.length) {
+                el.innerHTML = '<p class="room-empty">Nenhuma sala pública aberta agora. Crie a sua!</p>';
+                return;
+            }
+            lista.forEach(sala => {
+                const row = document.createElement('div');
+                row.className = 'room-row';
+                const info = document.createElement('div');
+                info.className = 'room-info';
+                const titulo = document.createElement('strong');
+                titulo.textContent = `Sala de ${sala.anfitriao}`;
+                const detalhe = document.createElement('span');
+                detalhe.textContent = `${sala.codigo} · ${sala.jogadores}/${sala.max} jogadores`;
+                info.appendChild(titulo);
+                info.appendChild(detalhe);
+
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-gold';
+                btn.style.padding = '8px 18px';
+                btn.textContent = 'Entrar';
+                btn.disabled = sala.jogadores >= sala.max;
+                btn.onclick = () => entrarNaSala(sala.codigo);
+
+                row.appendChild(info);
+                row.appendChild(btn);
+                el.appendChild(row);
+            });
+        }
+
+        socket.on('roomList', renderListaSalas);
+
+        socket.on('roomJoined', ({ codigo, publica }) => {
+            salaCodigo = codigo;
+            document.getElementById('salaCodigo').textContent = codigo;
+            document.getElementById('salaTipo').textContent = publica ? '🌐 Pública' : '🔒 Privada';
+            definirMenuOcupado(false);
+            limparErro();
+        });
+
+        function copiarCodigo() {
+            const btn = document.getElementById('copiarBtn');
+            const feito = () => { btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = 'Copiar', 1500); };
+            try {
+                navigator.clipboard.writeText(salaCodigo).then(feito, () => {});
+            } catch (e) { /* clipboard indisponível (http) — o código continua visível na tela */ }
+        }
+
+        function resetarParaMenu() {
+            salaCodigo = null;
+            players = [];
+            facts = {};
+            myRole = null;
+            detetiveConhecidoId = null;
+            clearInterval(apresentacaoTimer);
+            document.querySelectorAll('.screen').forEach(sc => sc.classList.remove('active'));
+            document.getElementById('menuScreen').classList.add('active');
+            definirMenuOcupado(false);
+            socket.emit('listRooms');
+        }
+
+        function sairDaSala() {
+            socket.emit('leaveRoom');
+            resetarParaMenu();
+        }
+
+        function voltarAoLobby() {
+            updateScreen(ESTADO_SALA.LOBBY);
+        }
+
+        socket.on('connect', () => {
+            socket.emit('listRooms');
+        });
+
+        socket.on('disconnect', () => {
+            if (salaCodigo) {
+                resetarParaMenu();
+                mostrarErro('Conexão com o servidor perdida. Entre em uma sala novamente.');
+            }
+        });
+
+        socket.on('finalResults', async (results) => {
+            updateScreen(ESTADO_SALA.RESULTADO);
+
+            const mentirosoNome = results.mentirosoReal.nome;
+            const vencedor = results.vencedor;
+            const acusado = players.find(p => p.id === results.acusadoId);
+            const acusadoNome = acusado ? acusado.nome : 'Ninguém (Empate)';
+
+            document.getElementById('mentirosoNomeGrande').textContent = mentirosoNome;
+
+            const resultText = document.getElementById('resultText');
+            resultText.innerHTML = '';
+
+            if (results.motivo === 'deducao_certa') {
+                resultText.innerHTML = `<span class="blue">VITÓRIA DO DETETIVE!</span> Ele apostou tudo numa dedução direta e acertou. Pontuação em dobro pra ele!`;
+            } else if (results.motivo === 'impostor_errou_alvo') {
+                resultText.innerHTML = `<span class="green">VITÓRIA DOS INOCENTES!</span> O Mentiroso tentou eliminar alguém em segredo, errou o alvo e se revelou.`;
+            } else if (vencedor === 'detetive') {
+                const detetiveNome = players.find(p => p.id === results.votoDetetive.eleitorId).nome;
+                resultText.innerHTML = `<span class="blue">VITÓRIA DO DETETIVE!</span> O Detetive (${detetiveNome}) acertou o Mentiroso.`;
+            } else if (vencedor === 'mentiroso') {
+                if (results.votoDetetive && results.votoDetetive.votadoId !== results.mentirosoReal.id) {
+                    const detetiveNome = players.find(p => p.id === results.votoDetetive.eleitorId).nome;
+                    const votoErradoNome = players.find(p => p.id === results.votoDetetive.votadoId).nome;
+                    resultText.innerHTML = `<span class="red">VITÓRIA DO MENTIROSO!</span> O Detetive (${detetiveNome}) votou em ${votoErradoNome} (inocente).`;
+                } else {
+                    resultText.innerHTML = `<span class="red">VITÓRIA DO MENTIROSO!</span> A maioria votou em ${acusadoNome} (inocente).`;
+                }
+            } else {
+                resultText.innerHTML = `<span class="green">VITÓRIA DOS INOCENTES!</span> Eles identificaram corretamente o Mentiroso (${acusadoNome}).`;
+            }
+
+            const detetiveVoteReveal = document.getElementById('detetiveVoteReveal');
+            detetiveVoteReveal.classList.add('hidden');
+            detetiveVoteReveal.innerHTML = '';
+
+            if (results.votoDetetive && results.votoDetetive.isRevelado) {
+                const detetive = players.find(p => p.id === results.votoDetetive.eleitorId);
+                const votadoPeloDetetive = players.find(p => p.id === results.votoDetetive.votadoId);
+                detetiveVoteReveal.classList.remove('hidden');
+                detetiveVoteReveal.innerHTML = `Voto revelado do Detetive: <strong>${detetive.nome}</strong> foi o mais votado e votou em <strong>${votadoPeloDetetive.nome}</strong>.`;
+            }
+        });
+
+        window.mostrarAba = mostrarAba;
+        window.definirPrivacidade = definirPrivacidade;
+        window.criarSala = criarSala;
+        window.entrarPorCodigo = entrarPorCodigo;
+        window.copiarCodigo = copiarCodigo;
+        window.sairDaSala = sairDaSala;
+        window.voltarAoLobby = voltarAoLobby;
+        window.startGame = startGame;
+        window.submitFact = submitFact;
+        window.sendMessage = sendMessage;
+        window.submitVote = submitVote;
+    </script>
+</body>
+</html>
