@@ -135,6 +135,7 @@
             white-space: nowrap;
         }
         .avatar-tile.eliminated { opacity: .28; filter: grayscale(1); }
+        .avatar-tile.offline { opacity: .35; filter: grayscale(.8); }
 
         /* ---------- menu / salas ---------- */
         .stack { display: flex; flex-direction: column; gap: 14px; }
@@ -495,6 +496,7 @@
             <button onclick="voltarAoLobby()" class="btn btn-gold btn-block">Voltar ao lobby</button>
         </div>
 
+        <p id="avisoBox" class="hidden" role="status" style="text-align:center; color:var(--gold); font-weight:700;"></p>
         <p id="errorBox" class="hidden"></p>
     </div>
 
@@ -504,7 +506,7 @@
             <ul>
                 <li>Todo mundo escreve um fato (ou mentira) sobre o tema sorteado.</li>
                 <li>O Mentiroso não sabe o tema de verdade — precisa disfarçar.</li>
-                <li>O Detetive sabe quem é quem votar certo, mas se apostar tudo numa dedução direta e errar, ninguém pontua.</li>
+                <li>O Detetive vota como todo mundo. Só usando a habilidade de dedução direta ele vence na hora: se acertar, pontos em dobro; se errar, o Mentiroso descobre quem ele é.</li>
                 <li>O Mentiroso pode tentar eliminar em segredo quem ele suspeita ser o Detetive — se errar, se revela.</li>
             </ul>
             <button class="btn btn-ghost btn-block" onclick="toggleRules()">Fechar</button>
@@ -649,13 +651,14 @@
 
             players.forEach(player => {
                 const tile = document.createElement('div');
-                tile.className = 'avatar-tile filled' + (player.id === myId ? ' you' : '');
+                tile.className = 'avatar-tile filled' + (player.id === myId ? ' you' : '') + (player.offline ? ' offline' : '');
                 tile.innerHTML = avatarSvg();
                 const wrap = document.createElement('div');
                 wrap.appendChild(tile);
                 const caption = document.createElement('p');
                 caption.className = 'player-slot-name';
-                caption.innerHTML = `${player.host ? '👑 ' : ''}${player.nome}${player.id === myId ? ' (Você)' : ''}<br><span class="player-slot-score">${player.score} pts</span>`;
+                caption.innerHTML = `${player.host ? '👑 ' : ''}${player.nome}${player.id === myId ? ' (Você)' : ''}<br>` +
+                    (player.offline ? '<span style="color:var(--danger)">reconectando...</span>' : `<span class="player-slot-score">${player.score} pts</span>`);
                 wrap.appendChild(caption);
                 grid.appendChild(wrap);
             });
@@ -665,7 +668,8 @@
             const souAnfitriao = playerList.some(p => p.id === myId && p.host);
             const startButton = document.getElementById('startButton');
             const lobbyMessage = document.getElementById('lobbyMessage');
-            const podeIniciar = souAnfitriao && playerList.length >= 2;
+            const online = playerList.filter(p => !p.offline).length;
+            const podeIniciar = souAnfitriao && online >= 2;
 
             startButton.disabled = !podeIniciar;
             startButton.classList.toggle('btn-gold', podeIniciar);
@@ -674,8 +678,8 @@
 
             if (!souAnfitriao) {
                 lobbyMessage.textContent = 'Aguardando o anfitrião iniciar a partida...';
-            } else if (playerList.length < 2) {
-                lobbyMessage.textContent = 'Mínimo de 2 jogadores para iniciar.';
+            } else if (online < 2) {
+                lobbyMessage.textContent = 'Mínimo de 2 jogadores conectados para iniciar.';
             } else {
                 lobbyMessage.textContent = '';
             }
@@ -828,6 +832,8 @@
         // Curiosidade aceita (pela IA ou sem verificação): agora é só esperar os outros
         socket.on('fatoAceito', () => {
             document.getElementById('factFeedback').classList.add('hidden');
+            document.getElementById('factInput').disabled = true;
+            document.getElementById('submitFactButton').disabled = true;
             document.getElementById('submitFactButton').textContent = 'Aguardando outros...';
         });
 
@@ -844,6 +850,11 @@
 
         function submitVote(votadoId) {
             socket.emit('submitVote', votadoId);
+            marcarVotoEnviado(votadoId);
+        }
+
+        // Também usado quando o jogador reconecta e já tinha votado
+        function marcarVotoEnviado(votadoId) {
             document.querySelectorAll('.mini-btn.vote').forEach(btn => btn.disabled = true);
             const votedButton = document.getElementById(`voteBtn-${votadoId}`);
             if (votedButton) votedButton.classList.add('selected');
@@ -859,6 +870,14 @@
             socket.emit('impostorKill', alvoId);
             document.querySelectorAll('#killButtons button').forEach(b => b.disabled = true);
         }
+
+        socket.on('votoRegistrado', ({ votadoId }) => marcarVotoEnviado(votadoId));
+
+        // Habilidade do impostor já usada (e a rodada seguiu): esconde o botão ao reconectar
+        socket.on('habilidadeUsada', () => {
+            document.getElementById('ativarMatarBtn').classList.add('hidden');
+            document.getElementById('killButtons').classList.add('hidden');
+        });
 
         socket.on('deducaoErrada', () => {
             document.getElementById('ativarDeducaoBtn').classList.add('hidden');
@@ -920,7 +939,7 @@
 
             const config = {
                 mentiroso: { label: 'VOCÊ É O MENTIROSO!', color: 'var(--danger)', hint: 'Ninguém pode saber. Disfarce seu fato e, se suspeitar do Detetive, elimine-o em segredo.' },
-                detetive: { label: 'VOCÊ É O DETETIVE!', color: 'var(--detective)', hint: 'Você pode votar normal ou apostar tudo numa dedução direta — acertar dobra seus pontos, errar zera a rodada.' },
+                detetive: { label: 'VOCÊ É O DETETIVE!', color: 'var(--detective)', hint: 'Seu voto vale como o de qualquer jogador. Só a habilidade de dedução direta decide a rodada: acertar vence na hora (pontos em dobro); errar revela quem você é ao Mentiroso.' },
                 inocente: { label: 'VOCÊ É INOCENTE!', color: 'var(--success)', hint: 'Preste atenção nos fatos dos outros e vote em quem parece estar mentindo.' }
             };
             const c = config[role] || config.inocente;
@@ -964,6 +983,35 @@
             errorBox.textContent = texto;
             errorBox.classList.remove('hidden');
         }
+        let avisoTimer = null;
+        function mostrarAviso(texto, ms) {
+            const el = document.getElementById('avisoBox');
+            el.textContent = texto;
+            el.classList.remove('hidden');
+            clearTimeout(avisoTimer);
+            if (ms) avisoTimer = setTimeout(() => el.classList.add('hidden'), ms);
+        }
+        function ocultarAviso() {
+            clearTimeout(avisoTimer);
+            document.getElementById('avisoBox').classList.add('hidden');
+        }
+
+        // Sessão guardada NESTA aba (sessionStorage): sobrevive a F5 e a quedas de rede,
+        // e deixa de existir quando a aba é fechada.
+        const CHAVE_SESSAO = 'mentiroso_sessao';
+        function salvarSessao(sessao) {
+            try { sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao)); } catch (e) { /* storage bloqueado */ }
+        }
+        function lerSessao() {
+            try {
+                const s = JSON.parse(sessionStorage.getItem(CHAVE_SESSAO));
+                return s && s.codigo && s.nome && s.token ? s : null;
+            } catch (e) { return null; }
+        }
+        function limparSessao() {
+            try { sessionStorage.removeItem(CHAVE_SESSAO); } catch (e) { /* ignora */ }
+        }
+
         function limparErro() {
             document.getElementById('errorBox').classList.add('hidden');
         }
@@ -1059,8 +1107,11 @@
 
         socket.on('roomList', renderListaSalas);
 
-        socket.on('roomJoined', ({ codigo, publica }) => {
+        socket.on('roomJoined', ({ codigo, publica, jogadorId }) => {
             salaCodigo = codigo;
+            myId = jogadorId; // id estável do jogador (não muda ao reconectar)
+            salvarSessao({ codigo, nome: myName, token: sessionToken });
+            ocultarAviso();
             document.getElementById('salaCodigo').textContent = codigo;
             document.getElementById('salaTipo').textContent = publica ? '🌐 Pública' : '🔒 Privada';
             definirMenuOcupado(false);
@@ -1090,6 +1141,7 @@
 
         function sairDaSala() {
             socket.emit('leaveRoom');
+            limparSessao();
             resetarParaMenu();
         }
 
@@ -1097,16 +1149,40 @@
             updateScreen(ESTADO_SALA.LOBBY);
         }
 
+        // Ao (re)conectar, se esta aba estava numa sala, tenta voltar para ela sozinha
         socket.on('connect', () => {
             socket.emit('listRooms');
-        });
-
-        socket.on('disconnect', () => {
-            if (salaCodigo) {
-                resetarParaMenu();
-                mostrarErro('Conexão com o servidor perdida. Entre em uma sala novamente.');
+            const sessao = lerSessao();
+            if (sessao) {
+                myName = sessao.nome;
+                sessionToken = sessao.token;
+                definirMenuOcupado(true);
+                mostrarAviso('Reconectando à sala...');
+                socket.emit('rejoinRoom', sessao);
             }
         });
+
+        // Caiu a conexão: NÃO sai da sala; o servidor guarda a vaga por um tempo
+        socket.on('disconnect', () => {
+            if (salaCodigo) mostrarAviso('Conexão perdida. Tentando reconectar...');
+        });
+
+        // O tempo de reconexão acabou, a sala sumiu ou a vaga não é mais sua
+        socket.on('rejoinFalhou', ({ motivo }) => {
+            limparSessao();
+            ocultarAviso();
+            resetarParaMenu();
+            mostrarErro(motivo || 'Não foi possível voltar para a sala.');
+        });
+
+        // Esta mesma identidade entrou em outra aba, que passa a ser a ativa
+        socket.on('substituido', () => {
+            limparSessao();
+            resetarParaMenu();
+            mostrarErro('Você entrou nesta sala em outra aba, então esta aba saiu da sala.');
+        });
+
+        socket.on('aviso', ({ texto }) => mostrarAviso(texto, 8000));
 
         socket.on('finalResults', async (results) => {
             updateScreen(ESTADO_SALA.RESULTADO);
@@ -1125,17 +1201,10 @@
                 resultText.innerHTML = `<span class="blue">VITÓRIA DO DETETIVE!</span> Ele apostou tudo numa dedução direta e acertou. Pontuação em dobro pra ele!`;
             } else if (results.motivo === 'impostor_errou_alvo') {
                 resultText.innerHTML = `<span class="green">VITÓRIA DOS INOCENTES!</span> O Mentiroso tentou eliminar alguém em segredo, errou o alvo e se revelou.`;
-            } else if (vencedor === 'detetive') {
-                const detetiveNome = players.find(p => p.id === results.votoDetetive.eleitorId).nome;
-                resultText.innerHTML = `<span class="blue">VITÓRIA DO DETETIVE!</span> O Detetive (${detetiveNome}) acertou o Mentiroso.`;
             } else if (vencedor === 'mentiroso') {
-                if (results.votoDetetive && results.votoDetetive.votadoId !== results.mentirosoReal.id) {
-                    const detetiveNome = players.find(p => p.id === results.votoDetetive.eleitorId).nome;
-                    const votoErradoNome = players.find(p => p.id === results.votoDetetive.votadoId).nome;
-                    resultText.innerHTML = `<span class="red">VITÓRIA DO MENTIROSO!</span> O Detetive (${detetiveNome}) votou em ${votoErradoNome} (inocente).`;
-                } else {
-                    resultText.innerHTML = `<span class="red">VITÓRIA DO MENTIROSO!</span> A maioria votou em ${acusadoNome} (inocente).`;
-                }
+                resultText.innerHTML = results.acusadoId
+                    ? `<span class="red">VITÓRIA DO MENTIROSO!</span> A maioria votou em ${acusadoNome} (inocente).`
+                    : `<span class="red">VITÓRIA DO MENTIROSO!</span> A votação empatou, então ninguém foi acusado.`;
             } else {
                 resultText.innerHTML = `<span class="green">VITÓRIA DOS INOCENTES!</span> Eles identificaram corretamente o Mentiroso (${acusadoNome}).`;
             }
@@ -1143,13 +1212,6 @@
             const detetiveVoteReveal = document.getElementById('detetiveVoteReveal');
             detetiveVoteReveal.classList.add('hidden');
             detetiveVoteReveal.innerHTML = '';
-
-            if (results.votoDetetive && results.votoDetetive.isRevelado) {
-                const detetive = players.find(p => p.id === results.votoDetetive.eleitorId);
-                const votadoPeloDetetive = players.find(p => p.id === results.votoDetetive.votadoId);
-                detetiveVoteReveal.classList.remove('hidden');
-                detetiveVoteReveal.innerHTML = `Voto revelado do Detetive: <strong>${detetive.nome}</strong> foi o mais votado e votou em <strong>${votadoPeloDetetive.nome}</strong>.`;
-            }
         });
 
         window.mostrarAba = mostrarAba;
