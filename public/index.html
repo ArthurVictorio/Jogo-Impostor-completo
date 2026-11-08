@@ -137,6 +137,74 @@
         .avatar-tile.eliminated { opacity: .28; filter: grayscale(1); }
         .avatar-tile.offline { opacity: .35; filter: grayscale(.8); }
 
+        /* ---------- tela inicial (splash) ---------- */
+        .app:has(#splashScreen.active) > .app-header { display: none; }
+        #splashScreen { align-items: center; justify-content: center; text-align: center; min-height: 80vh; position: relative; z-index: 1; gap: 14px; }
+        .splash-eyebrow { margin: 0; }
+        .splash-title { font-family: 'Playfair Display', serif; font-weight: 900; font-size: clamp(3rem, 11vw, 6.2rem); line-height: 1; margin: 0 0 14px; letter-spacing: .01em; text-shadow: 0 8px 40px rgba(0,0,0,.55); }
+        .splash-title .accent { color: var(--gold); }
+        .splash-menu { display: flex; flex-direction: column; gap: 12px; width: min(280px, 82vw); }
+        .splash-menu .btn { font-size: 1.1rem; padding: 15px 26px; }
+        .splash-version { margin-top: 18px; font-size: .72rem; color: var(--paper-dim); opacity: .7; }
+
+        /* créditos em rolagem infinita: esquerda desce, direita sobe */
+        .credit-col {
+            position: fixed; top: 0; bottom: 0; z-index: 0; pointer-events: none; overflow: hidden;
+            width: clamp(110px, 15vw, 190px); opacity: .5;
+            -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+            mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+        }
+        .credit-col.left { left: clamp(8px, 3vw, 56px); }
+        .credit-col.right { right: clamp(8px, 3vw, 56px); }
+        .credit-track { display: flex; flex-direction: column; will-change: transform; }
+        .credit-col.left .credit-track { animation: rolarBaixo 40s linear infinite; }
+        .credit-col.right .credit-track { animation: rolarCima 40s linear infinite; }
+        @keyframes rolarCima { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+        @keyframes rolarBaixo { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+        .credit-card {
+            aspect-ratio: 3 / 4; margin-bottom: 20px; border: 2px solid currentColor; border-radius: 16px;
+            background: linear-gradient(160deg, rgba(27,28,63,.95), rgba(10,11,31,.95));
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+        }
+        .credit-card svg { width: 58%; height: auto; }
+        .credit-label { font-family: 'Playfair Display', serif; font-weight: 800; font-size: .8rem; letter-spacing: .08em; }
+        .credit-tag { font-size: .55rem; color: var(--paper-dim); letter-spacing: .1em; text-transform: uppercase; }
+        @media (max-width: 640px) { .credit-col { width: 84px; opacity: .3; } }
+
+        /* ---------- criação de sala: modos e opções ---------- */
+        .cat-title { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 1.15rem; margin: 0 0 10px; color: var(--gold); text-align: left; }
+        .modo-grid { display: flex; flex-direction: column; gap: 10px; }
+        .opcao-linha { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+        .opcao-linha label { font-weight: 700; font-size: .9rem; }
+        .opcao-linha .valor { color: var(--gold); font-weight: 800; min-width: 3.2em; text-align: right; }
+        input[type="range"] { accent-color: var(--gold); width: 100%; margin: 6px 0 0; }
+        .range-marcas { display: flex; justify-content: space-between; font-size: .7rem; color: var(--paper-dim); margin-top: 2px; }
+        .switch { position: relative; display: inline-block; width: 52px; height: 28px; flex: none; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .trilho { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,.18); transition: background .2s; cursor: pointer; }
+        .switch .trilho::before { content: ""; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); transition: transform .2s; }
+        .switch input:checked + .trilho { background: var(--gold); }
+        .switch input:checked + .trilho::before { transform: translateX(24px); background: var(--ink); }
+        .switch input:focus-visible + .trilho { outline: 3px solid var(--gold); outline-offset: 2px; }
+        .resumo-sala { text-align: left; font-size: .8rem; color: var(--paper-dim); margin: 0; }
+
+        /* ---------- relógio da fase de escrita ---------- */
+        .fatos-timer { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.3rem; color: var(--gold); }
+        .fatos-timer.urgente { color: var(--danger); animation: piscar 1s steps(2) infinite; }
+        @keyframes piscar { 50% { opacity: .45; } }
+
+        /* ---------- modais ---------- */
+        .modal-fundo { position: fixed; inset: 0; background: rgba(3,3,12,.78); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 60; }
+        .modal-fundo.open { display: flex; }
+        .modal-fundo .card { max-width: 460px; width: 100%; }
+        .modal-fundo ul { padding-left: 18px; line-height: 1.7; font-size: .92rem; }
+        .em-breve { display: inline-block; background: var(--gold-soft); color: var(--gold); border: 1px solid var(--gold); border-radius: 999px; padding: 2px 12px; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .nome-pendente { color: var(--gold); font-style: italic; }
+        .opcao-desativada { opacity: .5; }
+        .opcao-desativada select, .opcao-desativada input { width: 100%; margin-top: 6px; }
+        .outcome-pill .gold { color: var(--gold); }
+        #auraBotoes { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 14px 0; }
+
         /* ---------- menu / salas ---------- */
         .stack { display: flex; flex-direction: column; gap: 14px; }
         .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(255,255,255,.06); padding: 5px; border-radius: 999px; }
@@ -322,18 +390,36 @@
         @media (prefers-reduced-motion: reduce) {
             .flip-inner { transition: none; }
             .clock-icon::before, .clock-icon::after { animation: none; }
+            .credit-col .credit-track { animation: none; }
+            .fatos-timer.urgente { animation: none; }
         }
     </style>
 </head>
 <body>
     <div id="app" class="app">
-        <div>
+        <div class="app-header">
             <p class="eyebrow">Um jogo de blefe e dedução</p>
             <h1 class="wordmark">O <span class="accent">Mentiroso</span></h1>
         </div>
 
+        <!-- TELA INICIAL -->
+        <div id="splashScreen" class="screen active">
+            <div class="credit-col left" aria-hidden="true"><div class="credit-track" id="creditosEsq"></div></div>
+            <div class="credit-col right" aria-hidden="true"><div class="credit-track" id="creditosDir"></div></div>
+
+            <p class="eyebrow splash-eyebrow">Um jogo de blefe e dedução</p>
+            <h1 class="splash-title">O <span class="accent">Mentiroso</span></h1>
+            <nav class="splash-menu" aria-label="Menu principal">
+                <button class="btn btn-gold" onclick="irParaMenu()">Jogar</button>
+                <button class="btn btn-ghost" onclick="toggleModal('optionsModal')">Opções</button>
+                <button class="btn btn-ghost" onclick="toggleModal('creditsModal')">Créditos</button>
+            </nav>
+            <p class="splash-version">versão 1.1</p>
+        </div>
+
         <!-- MENU: criar ou entrar em sala -->
-        <div id="menuScreen" class="screen active card" style="max-width:560px;">
+        <div id="menuScreen" class="screen card" style="max-width:560px;">
+            <button class="btn btn-ghost" style="align-self:flex-start; padding:8px 16px; font-size:.85rem;" onclick="voltarAoInicio()">← Início</button>
             <div>
                 <p class="eyebrow" style="text-align:left; margin-bottom:8px;">Seu nome</p>
                 <input type="text" id="playerNameInput" placeholder="Como quer ser chamado?" maxlength="15">
@@ -345,14 +431,48 @@
             </div>
 
             <div id="painelCriar" class="stack">
-                <div class="seg">
-                    <button id="segPublica" class="seg-btn active" onclick="definirPrivacidade(true)">
-                        <strong>🌐 Pública</strong><span>Aparece na lista; qualquer um pode entrar</span>
-                    </button>
-                    <button id="segPrivada" class="seg-btn" onclick="definirPrivacidade(false)">
-                        <strong>🔒 Privada</strong><span>Só entra quem tiver o código</span>
-                    </button>
-                </div>
+                <section aria-labelledby="catModos">
+                    <h2 id="catModos" class="cat-title">Modos</h2>
+                    <div class="modo-grid">
+                        <button class="seg-btn modo-btn active" data-modo="classico" onclick="definirModo('classico')">
+                            <strong>Clássico</strong><span>Mentiroso, Inocentes e Detetive, como sempre.</span>
+                        </button>
+                        <button class="seg-btn modo-btn" data-modo="semdetetive" onclick="definirModo('semdetetive')">
+                            <strong>Sem Detetive</strong><span>Sem a classe Detetive. O Impostor também perde a habilidade de eliminar.</span>
+                        </button>
+                        <button class="seg-btn modo-btn" data-modo="aura" onclick="definirModo('aura')">
+                            <strong>Aura</strong><span>Nova classe: joga como Inocente, mas se for a mais votada ganha um Último Suspiro para adivinhar o Mentiroso. Mínimo de 4 jogadores.</span>
+                        </button>
+                    </div>
+                </section>
+
+                <section aria-labelledby="catOpcoes" class="stack">
+                    <h2 id="catOpcoes" class="cat-title" style="margin-bottom:0;">Opções</h2>
+
+                    <div>
+                        <div class="opcao-linha"><label for="tempoEscrita">Tempo para escrever a curiosidade</label><span class="valor" id="tempoEscritaLabel">3 min</span></div>
+                        <input type="range" id="tempoEscrita" min="2" max="5" step="1" value="3" oninput="atualizarTempoLabel()">
+                        <div class="range-marcas"><span>2 min</span><span>3</span><span>4</span><span>5 min</span></div>
+                    </div>
+
+                    <div class="opcao-linha">
+                        <label for="mostragemToggle">Mostragem de curiosidade<br><small style="font-weight:400; color:var(--paper-dim);">Exibe as curiosidades uma a uma antes da votação</small></label>
+                        <span style="display:flex; align-items:center; gap:10px;">
+                            <span class="valor" id="mostragemLabel" style="min-width:2.4em;">Sim</span>
+                            <label class="switch"><input type="checkbox" id="mostragemToggle" checked onchange="atualizarMostragemLabel()"><span class="trilho"></span></label>
+                        </span>
+                    </div>
+
+                    <div class="seg">
+                        <button id="segPublica" class="seg-btn active" onclick="definirPrivacidade(true)">
+                            <strong>🌐 Pública</strong><span>Aparece na lista; qualquer um pode entrar</span>
+                        </button>
+                        <button id="segPrivada" class="seg-btn" onclick="definirPrivacidade(false)">
+                            <strong>🔒 Privada</strong><span>Só entra quem tiver o código</span>
+                        </button>
+                    </div>
+                </section>
+
                 <button id="criarBtn" class="btn btn-gold btn-block" onclick="criarSala()">Criar sala</button>
             </div>
 
@@ -375,6 +495,7 @@
                 </div>
                 <button id="copiarBtn" class="btn btn-ghost" onclick="copiarCodigo()">Copiar</button>
             </div>
+            <p id="salaConfig" class="resumo-sala"></p>
 
             <div>
                 <p class="eyebrow" style="text-align:left;">Jogadores na sala (<span id="playerCount">0</span>/12)</p>
@@ -410,7 +531,7 @@
             <p id="factFeedback" class="hidden" role="alert" style="margin:0; padding:10px 14px; border-radius:var(--radius-md); background:rgba(224,85,74,.14); border:1px solid var(--danger); font-size:.85rem; line-height:1.4;"></p>
             <div class="facts-footer">
                 <span style="font-size:.85rem; color:var(--paper-dim);">Tema: <strong id="factsThemeDisplay" style="color:var(--gold);"></strong></span>
-                <span class="clock-icon" aria-hidden="true"></span>
+                <span style="display:flex; align-items:center; gap:8px;" title="Tempo restante para escrever"><span class="clock-icon" aria-hidden="true"></span><strong id="factsTimer" class="fatos-timer">--:--</strong></span>
                 <button id="submitFactButton" onclick="submitFact()" class="btn btn-gold">Enviar</button>
             </div>
         </div>
@@ -500,16 +621,49 @@
         <p id="errorBox" class="hidden"></p>
     </div>
 
-    <div id="rulesModal">
+    <div id="rulesModal" class="modal-fundo">
         <div class="card">
             <p class="eyebrow" style="text-align:left;">Como jogar</p>
             <ul>
-                <li>Todo mundo escreve um fato (ou mentira) sobre o tema sorteado.</li>
-                <li>O Mentiroso não sabe o tema de verdade — precisa disfarçar.</li>
-                <li>O Detetive vota como todo mundo. Só usando a habilidade de dedução direta ele vence na hora: se acertar, pontos em dobro; se errar, o Mentiroso descobre quem ele é.</li>
-                <li>O Mentiroso pode tentar eliminar em segredo quem ele suspeita ser o Detetive — se errar, se revela.</li>
+                <li>Todo mundo escreve um fato (ou mentira) sobre o tema sorteado, dentro do tempo definido pela sala.</li>
+                <li>O Mentiroso precisa disfarçar. O Detetive vota como todo mundo, mas pode apostar numa dedução direta: acertou, vence na hora com pontos em dobro; errou, o Mentiroso descobre quem ele é.</li>
+                <li>O Mentiroso pode tentar eliminar em segredo quem suspeita ser o Detetive (não existe no modo Sem Detetive).</li>
+                <li>Modo Aura: se a Aura for a mais votada, ela tenta adivinhar o Mentiroso. Acertando, leva todos os pontos; errando, perde 20.</li>
             </ul>
             <button class="btn btn-ghost btn-block" onclick="toggleRules()">Fechar</button>
+        </div>
+    </div>
+
+    <div id="optionsModal" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="optionsTitulo">
+        <div class="card">
+            <p class="eyebrow" style="text-align:left;" id="optionsTitulo">Opções</p>
+            <p><span class="em-breve">Em desenvolvimento</span></p>
+            <p style="font-size:.9rem; color:var(--paper-dim); margin-top:0;">As configurações gerais do jogo vão aparecer aqui em breve.</p>
+            <div class="opcao-desativada"><label>Volume</label><input type="range" min="0" max="100" value="70" disabled></div>
+            <div class="opcao-desativada" style="margin:12px 0 18px;"><label>Idioma</label><select disabled><option>Português (Brasil)</option></select></div>
+            <button class="btn btn-ghost btn-block" onclick="toggleModal('optionsModal')">Fechar</button>
+        </div>
+    </div>
+
+    <div id="creditsModal" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="creditsTitulo">
+        <div class="card">
+            <p class="eyebrow" style="text-align:left;" id="creditsTitulo">Créditos</p>
+            <ul>
+                <li><strong>Desenvolvimento:</strong> <span class="nome-pendente">[coloque aqui o nome dos desenvolvedores]</span></li>
+                <li><strong>Artes:</strong> <span class="nome-pendente">[coloque aqui o nome dos artistas]</span> (as imagens atuais são temporárias)</li>
+                <li><strong>Tipografia:</strong> Playfair Display e Manrope (Google Fonts)</li>
+            </ul>
+            <button class="btn btn-ghost btn-block" onclick="toggleModal('creditsModal')">Fechar</button>
+        </div>
+    </div>
+
+    <div id="auraModal" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="auraTitulo">
+        <div class="card" style="text-align:center;">
+            <p class="eyebrow" id="auraTitulo">Último Suspiro</p>
+            <h2 class="wordmark" style="font-size:1.5rem; margin:6px 0;">Você foi a mais votada!</h2>
+            <p style="font-size:.92rem; line-height:1.5;">Quem é o Mentiroso? Acertando você leva <strong style="color:var(--gold)">todos os pontos</strong>. Errando, perde <strong style="color:var(--danger)">20</strong>.</p>
+            <div id="auraBotoes"></div>
+            <p style="font-size:.8rem; color:var(--paper-dim); margin:0;">Tempo restante: <strong id="auraTempo">30</strong>s</p>
         </div>
     </div>
 
@@ -522,6 +676,9 @@
         let players = [];
         let facts = {};
         let sessionToken = null;
+        let salaConfig = null;            // modo, tempo de escrita e mostragem da sala atual
+        let mostrarApresentacao = true;   // se a vitrine de curiosidades acontece nesta rodada
+        const MODOS_INFO = { classico: 'Clássico', semdetetive: 'Sem Detetive', aura: 'Aura' };
         const ESTADO_SALA = {
             LOBBY: 'lobby',
             ROLE: 'espera-role',
@@ -542,6 +699,7 @@
 
         function updateScreen(estado) {
             document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            if (estado !== ESTADO_SALA.FATOS) pararRelogioFatos();
 
             if (estado === ESTADO_SALA.VOTACAO) {
                 iniciarApresentacao();
@@ -575,6 +733,7 @@
 
         function iniciarApresentacao() {
             clearInterval(apresentacaoTimer);
+            if (!mostrarApresentacao) return; // sem vitrine: o servidor libera a votação em seguida
             document.getElementById('apresentacaoScreen').classList.add('active');
             apresentacaoOrdem = players.filter(p => Object.keys(facts).includes(p.id));
             apresentacaoIndex = 0;
@@ -669,7 +828,8 @@
             const startButton = document.getElementById('startButton');
             const lobbyMessage = document.getElementById('lobbyMessage');
             const online = playerList.filter(p => !p.offline).length;
-            const podeIniciar = souAnfitriao && online >= 2;
+            const minimo = salaConfig && salaConfig.modo === 'aura' ? 4 : 2;
+            const podeIniciar = souAnfitriao && online >= minimo;
 
             startButton.disabled = !podeIniciar;
             startButton.classList.toggle('btn-gold', podeIniciar);
@@ -678,8 +838,8 @@
 
             if (!souAnfitriao) {
                 lobbyMessage.textContent = 'Aguardando o anfitrião iniciar a partida...';
-            } else if (online < 2) {
-                lobbyMessage.textContent = 'Mínimo de 2 jogadores conectados para iniciar.';
+            } else if (online < minimo) {
+                lobbyMessage.textContent = `Mínimo de ${minimo} jogadores conectados para iniciar${minimo === 4 ? ' (modo Aura)' : ''}.`;
             } else {
                 lobbyMessage.textContent = '';
             }
@@ -709,9 +869,18 @@
             deduceButtons.innerHTML = '';
             killButtons.innerHTML = '';
 
-            document.getElementById('detectiveActionArea').classList.toggle('hidden', myRole !== 'detetive');
-            document.getElementById('impostorActionArea').classList.toggle('hidden', myRole !== 'mentiroso');
-            document.getElementById('eliminatedNotice').classList.add('hidden');
+            const semDetetive = salaConfig && salaConfig.modo === 'semdetetive';
+            const espectador = !facts[myId]; // não enviou a curiosidade a tempo
+            const podeEliminar = myRole === 'mentiroso' && !semDetetive && !espectador;
+            document.getElementById('detectiveActionArea').classList.toggle('hidden', myRole !== 'detetive' || espectador);
+            document.getElementById('impostorActionArea').classList.toggle('hidden', !podeEliminar);
+            const aviso = document.getElementById('eliminatedNotice');
+            aviso.textContent = 'Você foi eliminado desta rodada e não pode mais agir.';
+            aviso.classList.add('hidden');
+            if (espectador) {
+                aviso.textContent = 'Você não enviou a curiosidade a tempo e assiste a esta rodada como espectador.';
+                aviso.classList.remove('hidden');
+            }
 
             // Reseta os botões de ativação de habilidade (ficam escondidos até o jogador clicar)
             document.getElementById('ativarDeducaoBtn').classList.remove('hidden');
@@ -730,7 +899,7 @@
                 card.id = `factLi-${player.id}`;
                 card.innerHTML = `<p class="fact-name">${player.nome}${player.id === myId ? ' (você)' : ''}</p><p class="fact-text">${facts[player.id]}</p>`;
 
-                if (player.id !== myId) {
+                if (player.id !== myId && !espectador) {
                     const actions = document.createElement('div');
                     actions.className = 'fact-actions';
 
@@ -752,7 +921,7 @@
                         deduceBtn.onclick = () => detectiveDeduce(player.id);
                         deduceButtons.appendChild(deduceBtn);
                     }
-                    if (myRole === 'mentiroso') {
+                    if (podeEliminar) {
                         const killBtn = document.createElement('button');
                         killBtn.className = 'chip-btn impostor-chip';
                         killBtn.textContent = player.id === detetiveConhecidoId ? `🔎 ${player.nome} (Detetive!)` : player.nome;
@@ -927,8 +1096,107 @@
 
         socket.on('sessionToken', (token) => { sessionToken = token; });
 
-        socket.on('roleAssignment', ({ role, tema }) => {
+        // ---------- Tela inicial ----------
+        function arteTemporaria(classe) {
+            const base = `<ellipse cx="50" cy="60" rx="20" ry="24" fill="currentColor"/>
+                <path d="M18 42 Q50 20 82 42 L88 49 Q50 36 12 49 Z" fill="currentColor"/>
+                <rect x="36" y="26" width="28" height="15" rx="3" fill="currentColor"/>`;
+            const dados = {
+                mentiroso: { nome: 'MENTIROSO', cor: 'var(--danger)', extra: '<path d="M64 66 L84 44 L90 50 L70 74 Z" fill="currentColor"/>' },
+                detetive: { nome: 'DETETIVE', cor: 'var(--detective)', extra: '<circle cx="74" cy="72" r="10" fill="none" stroke="currentColor" stroke-width="4"/><path d="M81 79 L92 90" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>' },
+                inocente: { nome: 'INOCENTE', cor: 'var(--success)', extra: '' }
+            }[classe];
+            return `<div class="credit-card" style="color:${dados.cor}"><svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">${base}${dados.extra}</svg><span class="credit-label">${dados.nome}</span><span class="credit-tag">arte temporária</span></div>`;
+        }
+        // O conteúdo é repetido duas vezes: a animação anda exatamente metade e recomeça sem "pulo"
+        function montarCreditosAnimados() {
+            const ordemEsq = ['mentiroso', 'detetive', 'inocente'];
+            const ordemDir = ['inocente', 'mentiroso', 'detetive'];
+            const metade = (ordem) => Array.from({ length: 4 }, () => ordem.map(arteTemporaria).join('')).join('');
+            document.getElementById('creditosEsq').innerHTML = metade(ordemEsq) + metade(ordemEsq);
+            document.getElementById('creditosDir').innerHTML = metade(ordemDir) + metade(ordemDir);
+        }
+
+        function irParaMenu() {
+            document.getElementById('splashScreen').classList.remove('active');
+            document.getElementById('menuScreen').classList.add('active');
+            limparErro();
+            socket.emit('listRooms');
+        }
+        function voltarAoInicio() {
+            document.getElementById('menuScreen').classList.remove('active');
+            document.getElementById('splashScreen').classList.add('active');
+            limparErro();
+        }
+        function toggleModal(id) {
+            document.getElementById(id).classList.toggle('open');
+        }
+
+        // ---------- Relógio da fase de escrita ----------
+        let relogioFatos = null;
+        let fimFatosLocal = 0;
+        function pararRelogioFatos() {
+            clearInterval(relogioFatos);
+            relogioFatos = null;
+        }
+        function atualizarRelogioFatos() {
+            const restante = Math.max(0, fimFatosLocal - performance.now());
+            const seg = Math.ceil(restante / 1000);
+            const el = document.getElementById('factsTimer');
+            el.textContent = `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, '0')}`;
+            el.classList.toggle('urgente', seg <= 15);
+            if (restante <= 0) pararRelogioFatos();
+        }
+        socket.on('faseFatos', ({ restanteMs }) => {
+            fimFatosLocal = performance.now() + restanteMs;
+            pararRelogioFatos();
+            atualizarRelogioFatos();
+            relogioFatos = setInterval(atualizarRelogioFatos, 250);
+        });
+        // Acabou o tempo: envia o que já estiver escrito (se ainda não enviou)
+        socket.on('tempoEsgotado', () => {
+            const campo = document.getElementById('factInput');
+            if (!campo.disabled && campo.value.trim().length >= 5) submitFact();
+        });
+
+        // ---------- Modo Aura: Último Suspiro ----------
+        let auraContagem = null;
+        function fecharAuraModal() {
+            clearInterval(auraContagem);
+            document.getElementById('auraModal').classList.remove('open');
+        }
+        socket.on('auraPalpite', ({ candidatos, tempoMs }) => {
+            const caixa = document.getElementById('auraBotoes');
+            caixa.innerHTML = '';
+            candidatos.forEach(c => {
+                const b = document.createElement('button');
+                b.className = 'btn btn-gold';
+                b.textContent = c.nome;
+                b.onclick = () => {
+                    socket.emit('auraPalpite', c.id);
+                    fecharAuraModal();
+                    mostrarAviso('Palpite enviado! Aguardando o resultado...', 8000);
+                };
+                caixa.appendChild(b);
+            });
+            let restante = Math.round(tempoMs / 1000);
+            const rotulo = document.getElementById('auraTempo');
+            rotulo.textContent = restante;
+            clearInterval(auraContagem);
+            auraContagem = setInterval(() => {
+                restante = Math.max(0, restante - 1);
+                rotulo.textContent = restante;
+                if (restante <= 0) fecharAuraModal();
+            }, 1000);
+            document.getElementById('auraModal').classList.add('open');
+        });
+        socket.on('auraEmAndamento', ({ nome, tempoMs }) => {
+            mostrarAviso(`${nome} era a AURA e está usando o Último Suspiro para tentar adivinhar o Mentiroso...`, (tempoMs || 30000) + 2000);
+        });
+
+        socket.on('roleAssignment', ({ role, tema, modo }) => {
             myRole = role;
+            if (modo && (!salaConfig || salaConfig.modo !== modo)) salaConfig = { ...(salaConfig || {}), modo };
             detetiveConhecidoId = null;
             const roleBigLabel = document.getElementById('roleBigLabel');
             const roleHint = document.getElementById('roleHint');
@@ -938,8 +1206,9 @@
             flipInner.classList.remove('flipped');
 
             const config = {
-                mentiroso: { label: 'VOCÊ É O MENTIROSO!', color: 'var(--danger)', hint: 'Ninguém pode saber. Disfarce seu fato e, se suspeitar do Detetive, elimine-o em segredo.' },
+                mentiroso: { label: 'VOCÊ É O MENTIROSO!', color: 'var(--danger)', hint: modo === 'semdetetive' ? 'Ninguém pode saber. Escreva uma mentira convincente e escape da votação.' : 'Ninguém pode saber. Disfarce seu fato e, se suspeitar do Detetive, elimine-o em segredo.' },
                 detetive: { label: 'VOCÊ É O DETETIVE!', color: 'var(--detective)', hint: 'Seu voto vale como o de qualquer jogador. Só a habilidade de dedução direta decide a rodada: acertar vence na hora (pontos em dobro); errar revela quem você é ao Mentiroso.' },
+                aura: { label: 'VOCÊ É A AURA!', color: 'var(--gold)', hint: 'Você joga como um Inocente. Mas se for a mais votada, ganha o Último Suspiro: tente adivinhar o Mentiroso. Acertando, leva todos os pontos; errando, perde 20.' },
                 inocente: { label: 'VOCÊ É INOCENTE!', color: 'var(--success)', hint: 'Preste atenção nos fatos dos outros e vote em quem parece estar mentindo.' }
             };
             const c = config[role] || config.inocente;
@@ -961,6 +1230,7 @@
 
         socket.on('allFactsCollected', (data) => {
             facts = data.fatos;
+            mostrarApresentacao = data.mostrarApresentacao !== false;
             players = data.jogadores.map(j => {
                 const found = players.find(p => p.id === j.id);
                 return found ? { ...found, ...j } : { ...j, score: 0 };
@@ -1032,6 +1302,18 @@
             if (!criar) socket.emit('listRooms');
         }
 
+        let modoSelecionado = 'classico';
+        function definirModo(modo) {
+            modoSelecionado = modo;
+            document.querySelectorAll('.modo-btn').forEach(b => b.classList.toggle('active', b.dataset.modo === modo));
+        }
+        function atualizarTempoLabel() {
+            document.getElementById('tempoEscritaLabel').textContent = `${document.getElementById('tempoEscrita').value} min`;
+        }
+        function atualizarMostragemLabel() {
+            document.getElementById('mostragemLabel').textContent = document.getElementById('mostragemToggle').checked ? 'Sim' : 'Não';
+        }
+
         function definirPrivacidade(publica) {
             salaPublica = publica;
             document.getElementById('segPublica').classList.toggle('active', publica);
@@ -1053,7 +1335,14 @@
             if (!nome) return;
             limparErro();
             definirMenuOcupado(true);
-            socket.emit('createRoom', { nome, publica: salaPublica, token: sessionToken });
+            socket.emit('createRoom', {
+                nome,
+                publica: salaPublica,
+                token: sessionToken,
+                modo: modoSelecionado,
+                tempoEscrita: Number(document.getElementById('tempoEscrita').value),
+                mostragem: document.getElementById('mostragemToggle').checked
+            });
         }
 
         function entrarNaSala(codigo) {
@@ -1088,7 +1377,7 @@
                 const titulo = document.createElement('strong');
                 titulo.textContent = `Sala de ${sala.anfitriao}`;
                 const detalhe = document.createElement('span');
-                detalhe.textContent = `${sala.codigo} · ${sala.jogadores}/${sala.max} jogadores`;
+                detalhe.textContent = `${sala.codigo} · ${sala.modo || 'Clássico'} · ${sala.jogadores}/${sala.max} jogadores`;
                 info.appendChild(titulo);
                 info.appendChild(detalhe);
 
@@ -1107,8 +1396,16 @@
 
         socket.on('roomList', renderListaSalas);
 
-        socket.on('roomJoined', ({ codigo, publica, jogadorId }) => {
+        function atualizarResumoSala() {
+            const el = document.getElementById('salaConfig');
+            if (!salaConfig || !salaConfig.modo) { el.textContent = ''; return; }
+            el.textContent = `Modo ${MODOS_INFO[salaConfig.modo] || salaConfig.modo} · ${Math.round(salaConfig.tempoEscritaSeg / 60)} min para escrever · Mostragem de curiosidade: ${salaConfig.mostragem ? 'sim' : 'não'}`;
+        }
+
+        socket.on('roomJoined', ({ codigo, publica, jogadorId, config }) => {
             salaCodigo = codigo;
+            if (config) salaConfig = config;
+            atualizarResumoSala();
             myId = jogadorId; // id estável do jogador (não muda ao reconectar)
             salvarSessao({ codigo, nome: myName, token: sessionToken });
             ocultarAviso();
@@ -1128,6 +1425,8 @@
 
         function resetarParaMenu() {
             salaCodigo = null;
+            salaConfig = null;
+            fecharAuraModal();
             players = [];
             facts = {};
             myRole = null;
@@ -1194,10 +1493,19 @@
 
             document.getElementById('mentirosoNomeGrande').textContent = mentirosoNome;
 
+            fecharAuraModal();
+            ocultarAviso();
+
             const resultText = document.getElementById('resultText');
             resultText.innerHTML = '';
 
-            if (results.motivo === 'deducao_certa') {
+            if (results.motivo === 'aura_acertou') {
+                resultText.innerHTML = `<span class="gold">VITÓRIA ÉPICA DA AURA!</span> ${results.auraNome} foi a mais votada, mas adivinhou que ${results.palpiteNome} era o Mentiroso e levou ${results.pote} pontos!`;
+            } else if (results.motivo === 'aura_errou') {
+                resultText.innerHTML = `<span class="red">VITÓRIA DO MENTIROSO!</span> A Aura foi a mais votada, palpitou em ${results.palpiteNome} e errou: perde 20 pontos.`;
+            } else if (results.motivo === 'aura_sem_palpite') {
+                resultText.innerHTML = `<span class="red">VITÓRIA DO MENTIROSO!</span> A Aura foi a mais votada, mas não palpitou a tempo.`;
+            } else if (results.motivo === 'deducao_certa') {
                 resultText.innerHTML = `<span class="blue">VITÓRIA DO DETETIVE!</span> Ele apostou tudo numa dedução direta e acertou. Pontuação em dobro pra ele!`;
             } else if (results.motivo === 'impostor_errou_alvo') {
                 resultText.innerHTML = `<span class="green">VITÓRIA DOS INOCENTES!</span> O Mentiroso tentou eliminar alguém em segredo, errou o alvo e se revelou.`;
@@ -1214,6 +1522,12 @@
             detetiveVoteReveal.innerHTML = '';
         });
 
+        window.irParaMenu = irParaMenu;
+        window.voltarAoInicio = voltarAoInicio;
+        window.toggleModal = toggleModal;
+        window.definirModo = definirModo;
+        window.atualizarTempoLabel = atualizarTempoLabel;
+        window.atualizarMostragemLabel = atualizarMostragemLabel;
         window.mostrarAba = mostrarAba;
         window.definirPrivacidade = definirPrivacidade;
         window.criarSala = criarSala;
@@ -1225,6 +1539,13 @@
         window.submitFact = submitFact;
         window.sendMessage = sendMessage;
         window.submitVote = submitVote;
+
+        // ---------- Inicialização ----------
+        montarCreditosAnimados();
+        if (lerSessao()) { // recarregou a página no meio de uma partida: vai direto reconectar
+            document.getElementById('splashScreen').classList.remove('active');
+            document.getElementById('menuScreen').classList.add('active');
+        }
     </script>
 </body>
 </html>
