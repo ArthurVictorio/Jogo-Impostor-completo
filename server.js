@@ -55,6 +55,19 @@ const RECONEXAO_MS = (Number(process.env.TEMPO_RECONEXAO_SEGUNDOS) || 45) * 1000
 // Útil só para testar sozinho com várias abas (desliga a regra "um jogador por computador")
 const PERMITIR_MULTIPLAS_ABAS = /^(1|true|sim)$/i.test(process.env.PERMITIR_MULTIPLAS_ABAS || '');
 
+// ---- Modos e opções de partida (escolhidos pelo anfitrião ao criar a sala) ----
+const MODOS = {
+    classico:    { nome: 'Clássico',    min: 2 },
+    semdetetive: { nome: 'Sem Detetive', min: 2 },
+    aura:        { nome: 'Aura',        min: 4 } // Mentiroso + Detetive + Aura + ao menos 1 Inocente
+};
+const TEMPO_ESCRITA_MIN = 2, TEMPO_ESCRITA_MAX = 5, TEMPO_ESCRITA_PADRAO = 3; // minutos
+const AURA_PENALIDADE = 20;       // pontos perdidos se a Aura errar o palpite
+const AURA_BONUS_MINIMO = 20;     // "todos os pontos" nunca vale menos que a penalidade (evita prêmio zero no começo)
+const AURA_TEMPO_MS = (Number(process.env.TEMPO_PALPITE_AURA_SEGUNDOS) || 30) * 1000;
+// Folga depois do fim do tempo de escrita (para IA terminar de verificar o que foi enviado no último segundo)
+const GRACA_FATOS_MS = (Number(process.env.TESTE_GRACA_SEG) || 10) * 1000;
+
 const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem O/0/I/1 pra evitar confusão
 const SALA_BROWSE = 'browse'; // socket.io room de quem está olhando a lista de salas públicas
 
@@ -111,10 +124,25 @@ function gerarCodigoSala() {
     return codigo;
 }
 
-function criarSala(publica) {
+// Lê e valida a configuração enviada pelo cliente (nunca confia no que vem de fora)
+function lerConfig(payload) {
+    const p = payload || {};
+    const modo = Object.prototype.hasOwnProperty.call(MODOS, p.modo) ? p.modo : 'classico';
+    let minutos = Math.round(Number(p.tempoEscrita));
+    if (!Number.isFinite(minutos)) minutos = TEMPO_ESCRITA_PADRAO;
+    minutos = Math.min(TEMPO_ESCRITA_MAX, Math.max(TEMPO_ESCRITA_MIN, minutos));
+    return { modo, tempoEscritaSeg: minutos * 60, mostragem: p.mostragem !== false };
+}
+
+function criarSala(publica, config) {
     const sala = {
         codigo: gerarCodigoSala(),
         publica: !!publica,
+        config: config || lerConfig(null),
+        rodadaSeq: 0,
+        auraId: null,
+        palpiteAura: null,
+        faseFatosFim: null,
         hostToken: null,
         jogadores: [],
         estado: ESTADO_SALA.LOBBY,
@@ -185,6 +213,9 @@ function resetarRodada(sala) {
     sala.votosRecebidos = {};
     sala.mentirosoId = null;
     sala.detetiveId = null;
+    sala.auraId = null;
+    sala.palpiteAura = null;
+    sala.faseFatosFim = null;
     sala.deducaoUsada = false;
     sala.mataUsada = false;
     sala.detetiveRevelado = false;
@@ -218,6 +249,7 @@ function listaSalasPublicas() {
         const host = ativos.find(j => j.token === sala.hostToken) || ativos[0];
         lista.push({
             codigo: sala.codigo,
+            modo: MODOS[sala.config.modo].nome,
             anfitriao: host.nome,
             jogadores: ativos.length,
             max: MAX_JOGADORES
@@ -234,10 +266,13 @@ function emitirListaSalas() {
 // ANDAMENTO DA RODADA (checagens que podem ser reavaliadas quando alguém sai)
 // ---------------------------------------------------------------------------
 
-// Passa para a apresentação quando todo jogador da sala já tem curiosidade aceita.
-function concluirColetaSeCompleta(sala) {
+// Passa para a apresentação/votação quando todo jogador da sala já tem curiosidade aceita.
+// Com `forcar` (tempo esgotado) segue só com quem enviou; os demais assistem como espectadores.
+function concluirColetaSeCompleta(sala, forcar = false) {
     if (sala.estado !== ESTADO_SALA.FATOS) return;
-    if (sala.jogadores.length === 0 || !sala.jogadores.every(j => sala.fatos[j.id])) return;
+    const participantes = forcar ? sala.jogadores.filter(j => sala.fatos[j.id]) : sala.jogadores;
+    if (participantes.length === 0) return;
+    if (!forcar && !participantes.every(j => sala.fatos[j.id])) return;
 
     sala.estado = ESTADO_SALA.VOTACAO;
     sala.votacaoLiberada = false;
@@ -245,9 +280,33 @@ function concluirColetaSeCompleta(sala) {
 
     io.to(sala.codigo).emit('allFactsCollected', {
         fatos: sala.fatos,
-        jogadores: sala.jogadores.map(j => ({ id: j.id, nome: j.nome }))
+        jogadores: sala.jogadores.filter(j => sala.fatos[j.id]).map(j => ({ id: j.id, nome: j.nome })),
+        mostrarApresentacao: sala.config.mostragem
     });
     io.to(sala.codigo).emit('gameState', { estado: sala.estado });
+
+    // "Mostragem de curiosidade" desligada: pula a vitrine e vai direto para a votação
+    if (!sala.config.mostragem) {
+        sala.votacaoLiberada = true;
+        io.to(sala.codigo).emit('liberarVotacao');
+    }
+}
+
+// Acabou o tempo de escrita (+ folga): segue sem quem não enviou, ou cancela a rodada
+function encerrarColetaPorTempo(sala) {
+    if (sala.estado !== ESTADO_SALA.FATOS) return;
+    const comFato = sala.jogadores.filter(j => sala.fatos[j.id]);
+    if (!sala.fatos[sala.mentirosoId] || comFato.length < 2) {
+        voltarAoLobby(sala, 'Tempo esgotado: a rodada foi cancelada porque o Mentiroso ou jogadores demais não enviaram a curiosidade.');
+        emitirListaSalas();
+        return;
+    }
+    sala.jogadores.filter(j => !sala.fatos[j.id]).forEach(j => {
+        if (j.id === sala.detetiveId) sala.detetiveId = null;
+        if (j.id === sala.auraId) sala.auraId = null;
+        emitirPara(j, 'aviso', { texto: 'Você não enviou a curiosidade a tempo e assiste a esta rodada como espectador.' });
+    });
+    concluirColetaSeCompleta(sala, true);
 }
 
 // Só libera a tela de votação quando TODOS terminaram de ver as curiosidades.
@@ -262,7 +321,7 @@ function verificarLiberacaoVotacao(sala) {
 
 // Fecha a rodada quando todos que podem votar já votaram.
 function verificarVotosCompletos(sala) {
-    if (sala.estado !== ESTADO_SALA.VOTACAO || !sala.votacaoLiberada) return;
+    if (sala.estado !== ESTADO_SALA.VOTACAO || !sala.votacaoLiberada || sala.palpiteAura) return;
     const participantes = sala.jogadores.filter(j => sala.fatos[j.id] && j.id !== sala.jogadorMortoId);
     if (participantes.length === 0 || !participantes.every(j => sala.votosRecebidos[j.id])) return;
 
@@ -271,7 +330,39 @@ function verificarVotosCompletos(sala) {
     for (const [eleitor, alvo] of Object.entries(sala.votosRecebidos)) {
         if (ids.has(eleitor) && ids.has(alvo)) votosValidos[eleitor] = alvo;
     }
-    finalizarRodada(sala, processarVotos(participantes, sala.mentirosoId, votosValidos));
+    const resultado = processarVotos(participantes, sala.mentirosoId, votosValidos);
+
+    // Modo Aura: se a Aura foi a mais votada, ela ganha o "Último Suspiro"
+    if (sala.config.modo === 'aura' && sala.auraId && resultado.acusadoId === sala.auraId) {
+        iniciarPalpiteAura(sala, resultado, participantes);
+        return;
+    }
+    finalizarRodada(sala, resultado);
+}
+
+// ---------- Modo Aura: Último Suspiro ----------
+function iniciarPalpiteAura(sala, base, participantes) {
+    const aura = sala.jogadores.find(j => j.id === sala.auraId);
+    if (!aura) { finalizarRodada(sala, base); return; }
+
+    sala.palpiteAura = { base, auraId: aura.id };
+    const candidatos = participantes.filter(j => j.id !== aura.id).map(j => ({ id: j.id, nome: j.nome }));
+    emitirPara(aura, 'auraPalpite', { candidatos, tempoMs: AURA_TEMPO_MS });
+    sala.jogadores.filter(j => j.id !== aura.id)
+        .forEach(j => emitirPara(j, 'auraEmAndamento', { nome: aura.nome, tempoMs: AURA_TEMPO_MS }));
+
+    const seq = sala.rodadaSeq;
+    agendar(sala, () => {
+        if (sala.rodadaSeq !== seq || !sala.palpiteAura) return;
+        resolverAuraSemPalpite(sala);
+    }, AURA_TEMPO_MS);
+}
+
+// A Aura não palpitou a tempo (ou saiu): vale o resultado normal da votação
+function resolverAuraSemPalpite(sala) {
+    const { base } = sala.palpiteAura;
+    sala.palpiteAura = null;
+    finalizarRodada(sala, { ...base, motivo: 'aura_sem_palpite' });
 }
 
 function reavaliarSala(sala) {
@@ -315,7 +406,12 @@ function removerJogador(sala, jogador) {
             voltarAoLobby(sala, 'O Mentiroso saiu da sala. A rodada foi cancelada.');
         } else {
             if (jogador.id === sala.detetiveId) sala.detetiveId = null;
-            reavaliarSala(sala); // quem faltava podia ser o último que o jogo esperava
+            if (sala.palpiteAura && sala.palpiteAura.auraId === jogador.id) {
+                resolverAuraSemPalpite(sala);
+            } else {
+                if (jogador.id === sala.auraId) sala.auraId = null;
+                reavaliarSala(sala);
+            } // quem faltava podia ser o último que o jogo esperava
         }
     }
 
@@ -378,7 +474,7 @@ function computadorEmUso(deviceId, exceto) {
 // Reenvia ao socket tudo que ele precisa para voltar ao ponto em que a sala está
 function enviarEstado(socket, sala, jogador) {
     socket.emit('sessionToken', jogador.token);
-    socket.emit('roomJoined', { codigo: sala.codigo, publica: sala.publica, jogadorId: jogador.id });
+    socket.emit('roomJoined', { codigo: sala.codigo, publica: sala.publica, jogadorId: jogador.id, config: sala.config });
     socket.emit('playerListUpdate', listaJogadoresPublica(sala));
 
     const estado = sala.estado;
@@ -394,14 +490,19 @@ function enviarEstado(socket, sala, jogador) {
         return;
     }
 
-    if (jogador.role) socket.emit('roleAssignment', { role: jogador.role, tema: sala.temaAtual, detetiveHint: null });
+    if (jogador.role) socket.emit('roleAssignment', { role: jogador.role, tema: sala.temaAtual, modo: sala.config.modo, detetiveHint: null });
     if (estado === ESTADO_SALA.VOTACAO) {
         socket.emit('allFactsCollected', {
             fatos: sala.fatos,
-            jogadores: sala.jogadores.filter(j => sala.fatos[j.id]).map(j => ({ id: j.id, nome: j.nome }))
+            jogadores: sala.jogadores.filter(j => sala.fatos[j.id]).map(j => ({ id: j.id, nome: j.nome })),
+            mostrarApresentacao: sala.config.mostragem
         });
     }
     socket.emit('gameState', base);
+
+    if (estado === ESTADO_SALA.FATOS && sala.faseFatosFim) {
+        socket.emit('faseFatos', { restanteMs: Math.max(0, sala.faseFatosFim - Date.now()), totalMs: sala.config.tempoEscritaSeg * 1000 });
+    }
 
     if (estado === ESTADO_SALA.FATOS && sala.fatos[jogador.id]) socket.emit('fatoAceito');
 
@@ -410,6 +511,18 @@ function enviarEstado(socket, sala, jogador) {
         if (sala.votosRecebidos[jogador.id]) socket.emit('votoRegistrado', { votadoId: sala.votosRecebidos[jogador.id] });
         if (sala.jogadorMortoId) socket.emit('jogadorEliminado', { id: sala.jogadorMortoId });
         if (jogador.id === sala.detetiveId && sala.deducaoUsada) socket.emit('deducaoErrada');
+        if (sala.palpiteAura) {
+            const p = sala.palpiteAura;
+            if (jogador.id === p.auraId) {
+                socket.emit('auraPalpite', {
+                    candidatos: sala.jogadores.filter(j => sala.fatos[j.id] && j.id !== p.auraId && j.id !== sala.jogadorMortoId).map(j => ({ id: j.id, nome: j.nome })),
+                    tempoMs: AURA_TEMPO_MS
+                });
+            } else {
+                const aura = sala.jogadores.find(j => j.id === p.auraId);
+                if (aura) socket.emit('auraEmAndamento', { nome: aura.nome, tempoMs: AURA_TEMPO_MS });
+            }
+        }
         if (jogador.id === sala.mentirosoId) {
             if (sala.mataUsada) socket.emit('habilidadeUsada');
             if (sala.detetiveRevelado) {
@@ -522,7 +635,7 @@ io.on('connection', (socket) => {
         if (!nome) return;
 
         sairDaSala(socket);
-        const sala = criarSala(payload && payload.publica);
+        const sala = criarSala(payload && payload.publica, lerConfig(payload));
         if (!entrarNaSala(socket, sala, nome, payload && payload.token)) destruirSala(sala);
     });
 
@@ -568,10 +681,19 @@ io.on('connection', (socket) => {
         removerOffline(sala);
         emitirListaJogadores(sala);
         emitirListaSalas();
-        if (sala.jogadores.length < 2) return;
+
+        const modo = MODOS[sala.config.modo];
+        if (sala.jogadores.length < modo.min) {
+            if (sala.jogadores.length >= 2) {
+                socket.emit('aviso', { texto: `O modo ${modo.nome} precisa de pelo menos ${modo.min} jogadores.` });
+            }
+            return;
+        }
 
         sala.jogadores.forEach(j => j.role = 'inocente');
         resetarRodada(sala);
+        sala.rodadaSeq++;
+        const seq = sala.rodadaSeq;
 
         const mentiroso = sala.jogadores[Math.floor(Math.random() * sala.jogadores.length)];
         mentiroso.role = 'mentiroso';
@@ -579,20 +701,26 @@ io.on('connection', (socket) => {
 
         sala.temaAtual = TEMAS[Math.floor(Math.random() * TEMAS.length)];
 
-        // DETETIVE (mínimo de 3 jogadores)
-        if (sala.jogadores.length >= 3) {
+        const sortearInocente = () => {
             const candidatos = sala.jogadores.filter(j => j.role === 'inocente');
-            if (candidatos.length > 0) {
-                const detetive = candidatos[Math.floor(Math.random() * candidatos.length)];
-                detetive.role = 'detetive';
-                sala.detetiveId = detetive.id;
-            }
+            return candidatos.length ? candidatos[Math.floor(Math.random() * candidatos.length)] : null;
+        };
+
+        // DETETIVE: só nos modos com detetive e com ao menos 3 jogadores
+        if (sala.config.modo !== 'semdetetive' && sala.jogadores.length >= 3) {
+            const detetive = sortearInocente();
+            if (detetive) { detetive.role = 'detetive'; sala.detetiveId = detetive.id; }
+        }
+        // AURA: joga como Inocente, mas tem o Último Suspiro se for a mais votada
+        if (sala.config.modo === 'aura') {
+            const aura = sortearInocente();
+            if (aura) { aura.role = 'aura'; sala.auraId = aura.id; }
         }
 
         sala.estado = ESTADO_SALA.ROLE;
 
         sala.jogadores.forEach(j => {
-            emitirPara(j, 'roleAssignment', { role: j.role, tema: sala.temaAtual, detetiveHint: null });
+            emitirPara(j, 'roleAssignment', { role: j.role, tema: sala.temaAtual, modo: sala.config.modo, detetiveHint: null });
         });
 
         io.to(sala.codigo).emit('gameState', { estado: sala.estado });
@@ -600,9 +728,24 @@ io.on('connection', (socket) => {
         emitirListaSalas(); // sala deixou de estar disponível pra entrar
 
         agendar(sala, () => {
-            if (sala.estado !== ESTADO_SALA.ROLE) return;
+            if (sala.rodadaSeq !== seq || sala.estado !== ESTADO_SALA.ROLE) return;
             sala.estado = ESTADO_SALA.FATOS;
+
+            // TESTE_TEMPO_ESCRITA_SEG existe só para testes automatizados
+            const duracao = (Number(process.env.TESTE_TEMPO_ESCRITA_SEG) || sala.config.tempoEscritaSeg) * 1000;
+            sala.faseFatosFim = Date.now() + duracao;
             io.to(sala.codigo).emit('gameState', { estado: sala.estado });
+            io.to(sala.codigo).emit('faseFatos', { restanteMs: duracao, totalMs: duracao });
+
+            // Tempo esgotado: avisa os clientes (que enviam o que já escreveram) e, após a folga, fecha a fase
+            agendar(sala, () => {
+                if (sala.rodadaSeq !== seq || sala.estado !== ESTADO_SALA.FATOS) return;
+                io.to(sala.codigo).emit('tempoEsgotado');
+                agendar(sala, () => {
+                    if (sala.rodadaSeq !== seq) return;
+                    encerrarColetaPorTempo(sala);
+                }, GRACA_FATOS_MS);
+            }, duracao);
         }, 3000);
     });
 
@@ -686,9 +829,9 @@ io.on('connection', (socket) => {
         if (!c) return;
         const { sala, jogador } = c;
         if (sala.estado !== ESTADO_SALA.VOTACAO || !sala.votacaoLiberada) return;
-        if (jogador.id !== sala.detetiveId) return;
+        if (jogador.id !== sala.detetiveId || !sala.fatos[jogador.id]) return;
         if (sala.jogadorMortoId === sala.detetiveId) return;
-        if (sala.deducaoUsada) return;
+        if (sala.deducaoUsada || sala.palpiteAura) return;
         if (!sala.fatos[alvoId] || alvoId === jogador.id) return;
 
         sala.deducaoUsada = true;
@@ -730,7 +873,8 @@ io.on('connection', (socket) => {
         const { sala, jogador } = c;
         if (sala.estado !== ESTADO_SALA.VOTACAO || !sala.votacaoLiberada) return;
         if (jogador.id !== sala.mentirosoId) return;
-        if (sala.mataUsada) return;
+        if (sala.config.modo === 'semdetetive') return; // sem detetive não há o que caçar
+        if (sala.mataUsada || sala.palpiteAura) return;
         if (alvoId === jogador.id) return;
         if (!sala.fatos[alvoId]) return;
 
@@ -762,6 +906,48 @@ io.on('connection', (socket) => {
             pontuacoes,
             motivo: 'impostor_errou_alvo',
             votoDetetive: null
+        });
+    });
+
+    // AURA: Último Suspiro — tenta adivinhar o Mentiroso
+    socket.on('auraPalpite', (alvoId) => {
+        const c = contexto(socket);
+        if (!c) return;
+        const { sala, jogador } = c;
+        if (!sala.palpiteAura || sala.palpiteAura.auraId !== jogador.id) return;
+        if (alvoId === jogador.id || !sala.fatos[alvoId] || alvoId === sala.jogadorMortoId) return;
+        const alvo = sala.jogadores.find(j => j.id === alvoId);
+        if (!alvo) return;
+
+        const { base } = sala.palpiteAura;
+        sala.palpiteAura = null;
+        const acertou = alvoId === sala.mentirosoId;
+
+        if (!acertou) {
+            // Errou: perde 20 e o resultado da votação (Mentiroso escapa) segue valendo
+            finalizarRodada(sala, {
+                ...base,
+                motivo: 'aura_errou',
+                palpiteNome: alvo.nome,
+                pontuacoes: base.pontuacoes.map(p => p.id === jogador.id ? { ...p, pontos: -AURA_PENALIDADE } : p)
+            });
+            return;
+        }
+
+        // Acertou: leva TODOS os pontos da partida (a soma dos pontos dos outros jogadores, mínimo 20)
+        const somaOutros = sala.jogadores
+            .filter(j => j.id !== jogador.id)
+            .reduce((total, j) => total + Math.max(0, j.score), 0);
+        const pote = Math.max(AURA_BONUS_MINIMO, somaOutros);
+
+        finalizarRodada(sala, {
+            ...base,
+            vencedor: 'aura',
+            motivo: 'aura_acertou',
+            palpiteNome: alvo.nome,
+            auraNome: jogador.nome,
+            pote,
+            pontuacoes: base.pontuacoes.map(p => ({ id: p.id, pontos: p.id === jogador.id ? pote : 0 }))
         });
     });
 
@@ -824,7 +1010,7 @@ function processarVotos(jogadoresNaRodada, idMentiroso, votos) {
         for (const eleitorId in votos) {
             if (votos[eleitorId] !== idMentiroso) continue;
             const eleitor = jogadoresNaRodada.find(j => j.id === eleitorId);
-            if (eleitor && (eleitor.role === 'inocente' || eleitor.role === 'detetive')) {
+            if (eleitor && eleitor.role !== 'mentiroso') {
                 const p = pontuacoes.find(x => x.id === eleitorId);
                 if (p) p.pontos = 5;
             }
